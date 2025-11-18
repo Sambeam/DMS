@@ -47,9 +47,7 @@ function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, re
       }catch(error){
         console.error("Add course error:", error.response?.data || error.message);
         alert("Failed to save course.");
-      }
-      setCourses((prev) => (editingCourseId ? prev.map((c) => (c.id === editingCourseId ? payload : c)) : [payload, ...prev]));
-      resetCourseForm();
+      }s
     };
     return(
         <form onSubmit={handleCourseSubmit} className="space-y-4">
