@@ -134,3 +134,16 @@ const dashboardStateSchema = new mongoose.Schema(
 );
 
 export const DashboardState = mongoose.model("DashboardState", dashboardStateSchema);
+
+const noteCanvasSchema = new mongoose.Schema(
+    {
+        user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", unique: true, required: true },
+        data: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {},
+        },
+    },
+    { timestamps: true }
+);
+
+export const NoteCanvasState = mongoose.model("NoteCanvasState", noteCanvasSchema);

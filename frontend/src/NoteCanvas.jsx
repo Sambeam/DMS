@@ -7,15 +7,43 @@ import {
 import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import axios from "axios";
 
 // Explicitly reference the worker that Vite bundles for pdf.js
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const MAX_WIDTH = 1000;
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const createBlankPage = (id = 0) => ({ id, slides: [], lines: [], textBoxes: [] });
 
-export default function NoteCanvas() {
+const computeNextId = (pages = []) => {
+  let maxId = 0;
+  pages.forEach((page) => {
+    if (typeof page.id === "number") maxId = Math.max(maxId, page.id);
+    (page.lines ?? []).forEach((line) => {
+      if (typeof line.id === "number") maxId = Math.max(maxId, line.id);
+    });
+    (page.textBoxes ?? []).forEach((text) => {
+      if (typeof text.id === "number") maxId = Math.max(maxId, text.id);
+    });
+    (page.slides ?? []).forEach((slide) => {
+      if (typeof slide.id === "number") maxId = Math.max(maxId, slide.id);
+    });
+  });
+  return maxId + 1;
+};
+
+const fileToDataURL = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+export default function NoteCanvas({ userId }) {
   const stageRefs = useRef([]);
-  const [pages, setPages] = useState([]);
+  const [pages, setPages] = useState([createBlankPage(0)]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [tool, setTool] = useState("move");
   const [drawingColor, setDrawingColor] = useState("#000000");
@@ -28,6 +56,53 @@ export default function NoteCanvas() {
   const [addingText, setAddingText] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    let ignore = false;
+    const fetchState = async () => {
+      setIsLoading(true);
+      setLoadError("");
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/api/notes/state/${userId}`);
+        if (!data?.data) {
+          if (!ignore) {
+            setPages([createBlankPage(0)]);
+            setCurrentPageIndex(0);
+            setNextId(1);
+          }
+          return;
+        }
+        if (!ignore) {
+          const savedPages = Array.isArray(data.data.pages) && data.data.pages.length > 0 ? data.data.pages : [createBlankPage(0)];
+          setPages(savedPages);
+          setCurrentPageIndex(Math.min(data.data.currentPageIndex ?? 0, savedPages.length - 1));
+          setNextId(data.data.nextId ?? computeNextId(savedPages));
+        }
+      } catch (error) {
+        if (!ignore) {
+          if (error.response?.status === 404) {
+            setPages([createBlankPage(0)]);
+            setCurrentPageIndex(0);
+            setNextId(1);
+          } else {
+            console.error("Failed to load note canvas state", error);
+            setLoadError("Unable to load saved notes.");
+          }
+        }
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    };
+    fetchState();
+    return () => {
+      ignore = true;
+    };
+  }, [userId]);
 
   const hexToRGBA = (hex, alpha) => {
     let r = 0, g = 0, b = 0;
@@ -202,7 +277,7 @@ export default function NoteCanvas() {
           return newPages;
         });
       } else if (file.type.startsWith("image/")) {
-        const dataURL = URL.createObjectURL(file);
+        const dataURL = await fileToDataURL(file);
         setPages(prev => {
           const newPages = [...prev, { id: nextId, slides: [{ id: nextId, src: dataURL, width: MAX_WIDTH, height: 1000, yOffset: 0 }], lines: [], textBoxes: [] }];
           setCurrentPageIndex(newPages.length - 1);
@@ -217,6 +292,26 @@ export default function NoteCanvas() {
 
   const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
   const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.2));
+
+  const persistNotes = async () => {
+    if (!userId) {
+      setSaveMessage("Sign in to save notes.");
+      return;
+    }
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      const payload = { pages, currentPageIndex, nextId };
+      await axios.post(`${API_BASE_URL}/api/notes/state`, { userId, data: payload });
+      setSaveMessage("Notes saved.");
+    } catch (error) {
+      console.error("Failed to save note canvas state", error);
+      setSaveMessage("Failed to save notes.");
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(""), 4000);
+    }
+  };
 
   const savePageAsPDF = async () => {
     const stage = stageRefs.current[currentPageIndex];
@@ -255,6 +350,12 @@ export default function NoteCanvas() {
         <input type="file" multiple onChange={handleSlideUpload} />
         <button onClick={zoomIn}>🔍 +</button>
         <button onClick={zoomOut}>🔍 -</button>
+        <button onClick={persistNotes} disabled={isSaving || isLoading}>{isSaving ? "Saving..." : "Save Notes"}</button>
+        {(saveMessage || loadError) && (
+          <span style={{ color: loadError ? "red" : "green" }}>
+            {loadError || saveMessage}
+          </span>
+        )}
       </div>
 
       {/* Pages */}

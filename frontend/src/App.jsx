@@ -2183,7 +2183,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
       case "notes":
         return user ? (
           <Suspense fallback={<div className="p-6 bg-white rounded-xl shadow-sm">Loading notes...</div>}>
-            <NoteCanvas />
+            <NoteCanvas userId={userId} />
           </Suspense>
         ) : (
           <div className="p-6 bg-white rounded-xl shadow-sm text-gray-700">

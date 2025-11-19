@@ -497,6 +497,38 @@ export const getDashboardStateByUser = async (req, res) => {
     }
 };
 
+// Note canvas persistence
+export const upsertNoteCanvasState = async (req, res) => {
+    try {
+        const { userId, data } = req.body;
+        if (!userId) {
+            return res.status(400).json({ error: "userId is required" });
+        }
+        const payload = typeof data === "object" && data !== null ? data : {};
+        const state = await Models.NoteCanvasState.findOneAndUpdate(
+            { user_id: userId },
+            { data: payload },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        res.json({ success: true, data: state.data });
+    } catch (error) {
+        err_500(res, error);
+    }
+};
+
+export const getNoteCanvasState = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const state = await Models.NoteCanvasState.findOne({ user_id: userId });
+        if (!state) {
+            return res.status(404).json({ error: "Note canvas not found" });
+        }
+        res.json({ success: true, data: state.data });
+    } catch (error) {
+        err_500(res, error);
+    }
+};
+
 
 
 

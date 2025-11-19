@@ -109,6 +109,8 @@ router.get("/aiquery/user/:userId", validateParams(Schemas.makeIdSchema("userId"
 
 //for performance stat//
 router.get("/performance/user/:userId", validateParams(Schemas.makeIdSchema("userId")), controllers.getPerformanceStats);
+router.post("/notes/state", controllers.upsertNoteCanvasState);
+router.get("/notes/state/:userId", validateParams(Schemas.makeIdSchema("userId")), controllers.getNoteCanvasState);
 
 //for holiday//
 router.post("/sync",validate(Schemas.HolidaySchema), async (req ,res)=>{
