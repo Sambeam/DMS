@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, memo } from "react";
+import React, { useState, useEffect, memo } from "react";
 import axios from "axios";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
-function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, resetCourseForm}){
+function AddCourseForm({user,courseColorPalette, editingCourseId, onCourseCreated = () => {}, onDeleteCourse = () => {}, resetCourseForm}){
   const [courseForm, setCourseForm] = useState({
     code: "",
     name: "",
@@ -52,10 +53,10 @@ function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, re
         color: courseForm.color
       };
       try{
-        const response = await axios.post("http://localhost:3000/api/course",payload);
+        const response = await axios.post(`${API_BASE_URL}/api/course`,payload);
         const savedCourse = response.data;
         //update list of course in the page//
-        setCourses((prev)=>[savedCourse,...prev]);
+        onCourseCreated(savedCourse);
         resetCourseForm();
         alert("course saved");
       }catch(error){
@@ -152,7 +153,7 @@ function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, re
               {editingCourseId && (
                 <button
                   type="button"
-                  onClick={() => handleDeleteCourse(editingCourseId)}
+                  onClick={() => onDeleteCourse(editingCourseId)}
                   className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
                 >
                   Delete

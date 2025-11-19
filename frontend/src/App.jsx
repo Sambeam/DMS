@@ -60,6 +60,40 @@ const WEEKDAY_TO_INDEX = {
   Saturday: 6,
 };
 const INDEX_TO_WEEKDAY = Object.fromEntries(Object.entries(WEEKDAY_TO_INDEX).map(([day, idx]) => [idx, day]));
+const courseColorPalette = ["purple", "blue", "pink", "green", "orange"];
+
+const generateTemporaryCourseId = () => `course-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const normalizeCourse = (course) => {
+  if (!course) return null;
+  const resolvedId =
+    course.id ??
+    course._id ??
+    course.course_id ??
+    course.courseId ??
+    course.code ??
+    course.course_code ??
+    generateTemporaryCourseId();
+  const resolvedCode = course.code ?? course.course_code ?? course.courseName ?? "Course";
+  const resolvedName = course.name ?? course.course_name ?? resolvedCode;
+  return {
+    ...course,
+    id: String(resolvedId),
+    _id: course._id ?? String(resolvedId),
+    code: resolvedCode,
+    name: resolvedName,
+    instructor: course.instructor ?? course.instructor_name ?? "TBD",
+    credits:
+      typeof course.credits === "number"
+        ? course.credits
+        : Number(course.credit ?? course.credits ?? 0) || 0,
+    semester: course.semester ?? course.term ?? "TBD",
+    description: course.description ?? "",
+    color: course.color ?? courseColorPalette[0],
+  };
+};
+
+const normalizeCourses = (list) => (Array.isArray(list) ? list.map((course) => normalizeCourse(course)).filter(Boolean) : []);
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
@@ -205,7 +239,6 @@ const StudyHubApp = () => {
   const today = new Date();
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [calendarYear, setCalendarYear] = useState(today.getFullYear());
-  const courseColorPalette = ["purple", "blue", "pink", "green", "orange"];
   const [courseForm, setCourseForm] = useState({
     code: "",
     name: "",
@@ -260,7 +293,7 @@ const StudyHubApp = () => {
 
   const applyDashboardState = useCallback(
     (snapshot = DASHBOARD_DEFAULT_STATE) => {
-      setCourses(Array.isArray(snapshot.courses) ? snapshot.courses : []);
+      setCourses(Array.isArray(snapshot.courses) ? normalizeCourses(snapshot.courses) : []);
       setAssignments(Array.isArray(snapshot.assignments) ? snapshot.assignments : []);
       setClasses(Array.isArray(snapshot.classes) ? snapshot.classes : []);
       setNotebooks(Array.isArray(snapshot.notebooks) ? snapshot.notebooks : []);
@@ -437,20 +470,19 @@ const StudyHubApp = () => {
     }
   }, [googleReady, googleClientId, user, authScreen]);
 
-  useEffect(()=>{
-    if(!user||!user._id)return;
+  useEffect(() => {
+    if (!user?._id) return;
     const loadCourses = async () => {
-    try {
-      const res = await axios.get(`http://localhost:3000/api/course/user/${user._id}`);
-      setCourses(res.data);
-      alert("got course");
-    } catch (err) {
-      console.error("Failed to load courses", err);
-    }
-  }
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/course/user/${user._id}`);
+        setCourses(normalizeCourses(res.data));
+      } catch (err) {
+        console.error("Failed to load courses", err);
+      }
+    };
 
-  loadCourses();
-}, [user]);
+    loadCourses();
+  }, [user]);
 
 
   useEffect(() => {
@@ -551,9 +583,23 @@ const StudyHubApp = () => {
       description: courseForm.description.trim(),
       color: courseForm.color,
     };
-    setCourses((prev) => (editingCourseId ? prev.map((c) => (c.id === editingCourseId ? payload : c)) : [payload, ...prev]));
+    const normalizedPayload = normalizeCourse(payload);
+    setCourses((prev) =>
+      editingCourseId
+        ? prev.map((c) => (c.id === editingCourseId ? normalizedPayload : c))
+        : [normalizedPayload, ...prev]
+    );
     resetCourseForm();
   };
+
+  const handleCourseCreatedFromForm = useCallback(
+    (newCourse) => {
+      const normalized = normalizeCourse(newCourse);
+      if (!normalized) return;
+      setCourses((prev) => [normalized, ...prev]);
+    },
+    [setCourses]
+  );
 
   const handleEditCourse = (course) => {
     setEditingCourseId(course.id);
@@ -569,17 +615,20 @@ const StudyHubApp = () => {
     courseFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleDeleteCourse = async (courseId, course) => {
-    try{
-      const response = await axios.delete(`http://localhost:3000/api/course/${course._id}`);
-      console.log("Response from backend:",response.data);
-  
-      setCourses((prev) => prev.filter((course) => course._id !== courseId));
-    if (editingCourseId === courseId) {
-      resetCourseForm();
-    }
-    } catch (error){
-      console.log("Cannot removed the selected course",error);
+  const handleDeleteCourse = async (course) => {
+    try {
+      const backendId = course?._id ?? course?.id;
+      if (!backendId) {
+        console.error("Cannot remove course without an identifier.");
+        return;
+      }
+      await axios.delete(`${API_BASE_URL}/api/course/${backendId}`);
+      setCourses((prev) => prev.filter((item) => item.id !== (course.id ?? backendId)));
+      if (editingCourseId === (course.id ?? backendId)) {
+        resetCourseForm();
+      }
+    } catch (error) {
+      console.log("Cannot remove the selected course", error);
     }
   };
 
@@ -653,36 +702,8 @@ const StudyHubApp = () => {
     setIsScheduleModalOpen(true);
   };
 
- const handleAddCourse = async(e) => {
-    const newCourseObj ={
-      user_id: user._id,
-      course_code: courseFormData.code.trim(),
-      course_name: courseFormData.course_name,
-      instructor: courseFormData.instructor || "TBD",
-      credit: Number(courseFormData.credit) || 0,
-      description: courseFormData.description || "",
-      color: courseFormData.color
-    };
-    try{
-      const response = await axios.post("http://localhost:3000/api/course", newCourseObj);
-      const savedCourse = response.data;
-      alert("successful");
-
-      setCourses((prev) => [savedCourses, ...prev]);
-      setCurrentPage("courses");
-      resetCourseForm();
-      setTimeout(() => {
-      courseFormRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 0);
-    }catch(error){
-      console.error("Error adding course:", error.response?.data || error.message);
-      alert("Cannot add course");
-    }
+  const handleAddCourse = () => {
     setCurrentPage("courses");
-    resetCourseForm();
     setTimeout(() => {
       courseFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 0);
@@ -1038,7 +1059,19 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               </button>
             )}
           </div>
-          <AddCourseForm user={user} courseColorPalette={courseColorPalette} editingCourseId={editingCourseId} setCourses={setCourses} resetCourseForm={resetCourseForm}/>
+          <AddCourseForm
+            user={user}
+            courseColorPalette={courseColorPalette}
+            editingCourseId={editingCourseId}
+            onCourseCreated={handleCourseCreatedFromForm}
+            onDeleteCourse={(courseId) => {
+              const targetCourse = courses.find((c) => c.id === courseId);
+              if (targetCourse) {
+                handleDeleteCourse(targetCourse);
+              }
+            }}
+            resetCourseForm={resetCourseForm}
+          />
         </div>
 
         {courses.length === 0 ? (
@@ -1048,7 +1081,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
-              <div key={course._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div key={course.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className={`bg-gradient-to-br ${colorClasses[course.color]} p-6 text-white relative`}>
                   <div className="absolute top-4 right-4 flex space-x-2">
                     <button
@@ -1058,7 +1091,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteCourse(course._id, course)}
+                      onClick={() => handleDeleteCourse(course)}
                       className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />
