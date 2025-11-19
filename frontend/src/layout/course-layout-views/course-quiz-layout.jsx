@@ -5,34 +5,40 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AddButton from "../../assets/AddButton.png";
 import { useEffect } from "react";
+import axios from "axios";
+
 
 
 export default function QuizView({ course }){
   //the state to describe the visibility of the quiz generating form//
   const [newQuiz, setNewQuizForm] = useState(false);
   const [quizzes, setQuizzes] = useState([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  //test entries for quizzes//
-  useEffect(() => {
-    let allQuizzes = []
-    const storedQuizzes = localStorage.getItem("quizes");
-    allQuizzes = JSON.parse(storedQuizzes);
-    if(allQuizzes){
-          let courseQuizzes = allQuizzes.filter((q)=> String(q.course_id) == String(course.course_id));
-              setQuizzes(courseQuizzes);
 
+  useEffect(()=>{
+    if(!course||!course._id)return;
+    const loadQuiz = async () => {
+    try {
+      const res = await axios.get(`http://localhost:3000/api/quiz/course/${course._id}`);
+      setQuizzes(res.data);  
+    } catch (err) {
+      console.error("Failed to load courseworks", err);
     }
-  },[course]);
+  }
+
+  loadQuiz();
+  }, [course]);
 
   //handle the event of user clicking quiz block(graded or not)//
   const openQuiz = (quiz) => {
     localStorage.setItem("returnToCourseLayout", "true"); //to return from quiz page to course page//
     localStorage.setItem("selectedCourse", JSON.stringify(course)); //flag the current course page//
     localStorage.setItem("courseLayoutTab", "3"); //flag the current view of in the course page//
-    if (quiz && quiz.grade == "") { //if quiz is not completed
-      navigate(`/quiz/${quiz.quiz_id}`,{state:{displayType: "quiz"}}); //navigate to quiz page in quiz mode//
+    if (quiz && quiz.quiz_grade == "") { //if quiz is not completed
+      navigate(`/quiz/${quiz._id}`,{state:{displayType: "quiz"}}); //navigate to quiz page in quiz mode//
     }else{
-      navigate(`/quiz/${quiz.quiz_id}`,{state:{displayType: "review"}}); //navigate to quiz page in review mode//
+      navigate(`/quiz/${quiz._id}`,{state:{displayType: "review"}}); //navigate to quiz page in review mode//
     }
   };
   
@@ -54,7 +60,7 @@ export default function QuizView({ course }){
         </button>
         {quizzes.map((quiz) => (
           <div
-            key={quiz.quiz_id}
+            key={quiz._id}
             onClick={() => openQuiz(quiz)}
             className="bg-white shadow-md rounded-xl border border-gray-300 p-4 w-full mx-auto hover:shadow-lg transition"
           >
@@ -70,13 +76,13 @@ export default function QuizView({ course }){
           </div>
         ))}
       </div>
-      {newQuiz && <NewQuizForm onClose={() => setNewQuizForm(false)} />}
+      {newQuiz && <NewQuizForm onClose={() => setNewQuizForm(false)} setQuizzes={setQuizzes} setLoading={setLoading}/>}
     </div>
   );
 }
 
 //build a form for user to define a new quiz//
-function NewQuizForm({ onClose }){
+function NewQuizForm({ onClose, setQuizzes, setLoading }){
   const [numQuestions, setNumQuestions] = useState(0);
   const [file, setFile] = useState(null);
 
@@ -89,9 +95,9 @@ function NewQuizForm({ onClose }){
       onClose(); 
     }else{ 
       setLoading(true);
-      const quiz = await callGenerateQuizAPI(file, numQuestions); //passes arguments of new quiz//
+      const quiz = await callGenerateQuizAPI(file, numQuestions, setLoading); //passes arguments of new quiz//
       if(quiz.success){
-        setQuiz(quiz); 
+        setQuizzes(prev => [...prev, quiz]);
       }else{
         alert("Failed to generate quiz: " + quiz.error);
       }
@@ -105,7 +111,7 @@ function NewQuizForm({ onClose }){
         <form onSubmit={generateQuiz}>
           <h2 className="text-xl font-semibold mb-4 text-gray-800">Make a New Quiz</h2>
           <p className="text-l font-semibold mb-4 text-black">Reference File:</p>
-          <input type="file" onChange={(e) => setFile(e.target.value)} className="w-full text-black bg-white border border-gray-300 rounded p-2 appearance-none file:bg-blue-600 file:text-white file:border-0 file:rounded file:px-3 file:py-1 hover:file:bg-blue-700 mb-4"></input>
+          <input type="file" onChange={(e) => setFile(e.target.files[0])} className="w-full text-black bg-white border border-gray-300 rounded p-2 appearance-none file:bg-blue-600 file:text-white file:border-0 file:rounded file:px-3 file:py-1 hover:file:bg-blue-700 mb-4"></input>
           <p className="text-l font-semibold mb-2 text-black">Number of Question: {numQuestions}</p>
           <div className="mb-4">
             <input type="range" min="1" max="10" value={numQuestions} onChange={(e) => setNumQuestions(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
@@ -128,7 +134,7 @@ function NewQuizForm({ onClose }){
   );
 }
 
-async function callGenerateQuizAPI(file , numQuestions){
+async function callGenerateQuizAPI(file , numQuestions, setLoading){
   //insert argument to formData
   const formData = new FormData();
   formData.append("file", file);
