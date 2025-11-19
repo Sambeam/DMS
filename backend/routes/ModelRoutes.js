@@ -2,10 +2,12 @@
 this script add routes manage schema in database (create, get, delete and put)
 */
 import express from "express";
+import multer from "multer";
 import * as controllers from "../controllers/ModelController.js";
 import * as updateControllers from "../controllers/PutControllers.js";
 import * as deleteControllers from "../controllers/DeleteControllers.js";
 import axios from "axios";
+import * as modelJS from "../models/models.js";
 import { Holiday } from "../models/models.js"
 import {validate} from "../DataValidation/ValidateEntry.js";
 import { validateParams } from "../DataValidation/ValidateEntry.js";
@@ -16,7 +18,7 @@ import {loginAttempt} from "../controllers/AuthenticationController.js";
 
 const router = express.Router();
 
-const models = ["user", "course","coursework","quiz","question","resource","event","eventtag","studysection", "studynote","notepage","aiquery","performancestat"];
+const models = ["user", "course","coursework","quiz","question","event","eventtag","studysection", "studynote","notepage","aiquery","performancestat"];
 
 const zod_schemas = {
     user: Schemas.UserSchema,
@@ -24,7 +26,6 @@ const zod_schemas = {
     coursework: Schemas.CourseWorkSchema,
     quiz: Schemas.QuizSchema,
     question: Schemas.QuestionSchema,
-    resource: Schemas.ResourceSchema,
     event: Schemas.CalendarEventSchema,
     studysection: Schemas.StudySectionSchema,
     studynote: Schemas.StudyNoteSchema,
@@ -41,7 +42,6 @@ const create_controllers = {
     coursework: controllers.createCourseWork,
     quiz: controllers.createQuiz,
     question: controllers.createQuestion,
-    resource: controllers.createResource,
     event: controllers.createEvent,
     eventtag: controllers.createEventTag,
     studysection: controllers.createStudySection,
@@ -58,6 +58,35 @@ for (const m of models){
 
 //for login//
 router.post(`/user/login`, loginAttempt);
+
+//disk storage of actual file//
+const storage = multer.diskStorage({
+  destination: "uploads/",
+  filename: (req, file, cb) => {
+    cb(null, file.originalname); 
+  },
+});
+
+const upload = multer({storage});
+
+//for resource//
+router.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    const resourceData = JSON.parse(req.body.resource);
+
+    //store file using multer//
+    const filePath = `/uploads/${req.file.originalname}`;
+    resourceData.file_url = filePath;
+
+    //save metadata to mongodb//
+    const newResource = await modelJS.Resource.create(resourceData);
+
+    res.json(newResource);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
 
 //for user//
 router.get("/user", controllers.getUsers);

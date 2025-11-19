@@ -64,7 +64,7 @@ function CustomTab({course}) {
                 <QuizView course={course} />
             </TabPanel>
             <TabPanel value="4">
-                    <ResourceView />
+                    <ResourceView course={course} />
             </TabPanel>
         </TabContext>
     </div>

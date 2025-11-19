@@ -30,8 +30,8 @@ import Quiz from "./layout/quiz-layout.jsx";
 import AuthPage from "./Authentication/AuthPage.jsx"
 import LandingPage from "./Authentication/LandingPage.jsx"
 import axios from "axios";
-
 const NoteCanvas = lazy(() => import("./NoteCanvas.jsx"));
+import AddCourseForm from "./AddCourseForm.jsx";
 
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -228,6 +228,8 @@ const StudyHubApp = () => {
     endTime: "10:00",
     location: "",
   });
+
+  
 
   const [holidays, setHolidays] = useState([]);
   const [holidayError, setHolidayError] = useState("");
@@ -435,6 +437,21 @@ const StudyHubApp = () => {
     }
   }, [googleReady, googleClientId, user, authScreen]);
 
+  useEffect(()=>{
+    if(!user||!user._id)return;
+    const loadCourses = async () => {
+    try {
+      const res = await axios.get(`http://localhost:3000/api/course/user/${user._id}`);
+      setCourses(res.data);
+      alert("got course");
+    } catch (err) {
+      console.error("Failed to load courses", err);
+    }
+  }
+
+  loadCourses();
+}, [user]);
+
 
   useEffect(() => {
     if (courses.length === 0) {
@@ -630,7 +647,34 @@ const StudyHubApp = () => {
     setIsScheduleModalOpen(true);
   };
 
-  const handleAddCourse = () => {
+ const handleAddCourse = async(e) => {
+    const newCourseObj ={
+      user_id: user._id,
+      course_code: courseFormData.code.trim(),
+      course_name: courseFormData.course_name,
+      instructor: courseFormData.instructor || "TBD",
+      credit: Number(courseFormData.credit) || 0,
+      description: courseFormData.description || "",
+      color: courseFormData.color
+    };
+    try{
+      const response = await axios.post("http://localhost:3000/api/course", newCourseObj);
+      const savedCourse = response.data;
+      alert("successful");
+
+      setCourses((prev) => [savedCourses, ...prev]);
+      setCurrentPage("courses");
+      resetCourseForm();
+      setTimeout(() => {
+      courseFormRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+    }catch(error){
+      console.error("Error adding course:", error.response?.data || error.message);
+      alert("Cannot add course");
+    }
     setCurrentPage("courses");
     resetCourseForm();
     setTimeout(() => {
@@ -988,108 +1032,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               </button>
             )}
           </div>
-          <form onSubmit={handleCourseSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Course Code</label>
-                <input
-                  name="code"
-                  value={courseForm.code}
-                  onChange={handleCourseInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="e.g. CS101"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Course Name</label>
-                <input
-                  name="name"
-                  value={courseForm.name}
-                  onChange={handleCourseInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="Introduction to CS"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Instructor</label>
-                <input
-                  name="instructor"
-                  value={courseForm.instructor}
-                  onChange={handleCourseInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="Dr. Jane Doe"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Credits</label>
-                <input
-                  type="number"
-                  min="0"
-                  name="credits"
-                  value={courseForm.credits}
-                  onChange={handleCourseInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                <input
-                  name="semester"
-                  value={courseForm.semester}
-                  onChange={handleCourseInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="Fall 2024"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Accent Color</label>
-                <select
-                  name="color"
-                  value={courseForm.color}
-                  onChange={handleCourseInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  {courseColorPalette.map((color) => (
-                    <option key={color} value={color}>
-                      {color.charAt(0).toUpperCase() + color.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                name="description"
-                value={courseForm.description}
-                onChange={handleCourseInputChange}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                rows="3"
-                placeholder="Brief summary of the course"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-3">
-              {editingCourseId && (
-                <button
-                  type="button"
-                  onClick={() => handleDeleteCourse(editingCourseId)}
-                  className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
-                >
-                  Delete
-                </button>
-              )}
-              <button
-                type="submit"
-                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
-              >
-                {editingCourseId ? "Save Changes" : "Add Course"}
-              </button>
-            </div>
-          </form>
+          <AddCourseForm user={user} courseColorPalette={courseColorPalette} editingCourseId={editingCourseId} setCourses={setCourses} resetCourseForm={resetCourseForm}/>
         </div>
 
         {courses.length === 0 ? (
@@ -1099,7 +1042,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
-              <div key={course.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div key={course._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className={`bg-gradient-to-br ${colorClasses[course.color]} p-6 text-white relative`}>
                   <div className="absolute top-4 right-4 flex space-x-2">
                     <button

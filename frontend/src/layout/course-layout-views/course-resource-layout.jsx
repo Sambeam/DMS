@@ -2,19 +2,28 @@ import React, {useEffect,useState} from "react";
 import Dumpster from "../../assets/trash_icon.png";
 import AddButton from "../../assets/AddButton.png";
 import FileViewer from "../../FileViewer.jsx";
+import axios from "axios";
 
-export default function ResourceView(){
+export default function ResourceView({course}){
   const [testResources, setResources] = useState([]);
   //file upload form state//
   const[showForm, setShowForm]= useState(false);
   const[fileViewer, setFileToOpen] = useState("");
 
-  useEffect(() => {
-      const localDB = localStorage.getItem("resources");
-      if(localDB){
-        setResources(JSON.parse(localDB));
-      }
-  }, []);
+  //retrieve file of same course ID//
+  useEffect(()=>{
+    if(!course||!course._id)return;
+    const loadRes = async () => {
+    try {
+      const res = await axios.get(`http://localhost:3000/api/resource/course/${course._id}`);
+      setResources(res.data);  
+    } catch (err) {
+      console.error("Failed to load courseworks", err);
+    }
+  }
+
+  loadRes();
+  }, [course]);
 
   const fileDeleteHandler = (file) => {  
     const user_confirmation = window.confirm(`You are about to delete ${file.resource_name}.${file.type}`);
@@ -40,7 +49,7 @@ export default function ResourceView(){
           <img src={AddButton} alt="Add File" className="w-5 h-5" />
           Upload a file
         </button>
-        {showForm && <UploadForm setShowForm={setShowForm} setResources={setResources}/>}
+        {showForm && <UploadForm setShowForm={setShowForm} setResources={setResources} course={course}/>}
         {testResources.map((tr) => (
           <div key={tr.resource_id} className="flex justify-between items-center py-3" onClick={(() => setFileToOpen(tr.file_url))}>
             <span className="text-gray-800 font-medium">{tr.resource_name}</span>
@@ -62,7 +71,7 @@ export default function ResourceView(){
   );
 }
 
-function UploadForm ({setShowForm, setResources}){
+function UploadForm ({setShowForm, setResources,course}){
   const [uploadFileName, setUploadFileName] = useState("");
   const [fileToUpload, setFileToUpload] = useState(null);
   const [uploadFileType, setFileType] = useState("");
@@ -71,29 +80,34 @@ function UploadForm ({setShowForm, setResources}){
     setShowForm(false);
   };
 
-  const handleFormSubmit = (e) =>{
+  const handleFormSubmit = async(e) =>{
     e.preventDefault();
     if(!fileToUpload){
       alert("No file selected");
       return;
     }
 
-    const randomId = Math.floor(Math.random()*100000);
-
+    //make resource obj//
     const resource = {
-      resource_id: randomId,
+      course_id: course._id,
       resource_name: (uploadFileName == "" ? fileToUpload.name.split(".")[0] : uploadFileName),
       file_url: `/uploads/${fileToUpload.name}`,
       type: fileToUpload.type.split("/")[1],
       last_updated_time: new Date().toISOString().split("T")[0],
     };
 
-    const existing_resource = JSON.parse(localStorage.getItem("resources")) || [];
-    const updated_resource = [...existing_resource,resource];
-    localStorage.setItem("resources",JSON.stringify(updated_resource));
-    setResources(updated_resource);
+    //make file to push to uploads//
+    const formData = new FormData();
+    formData.append("file",fileToUpload);
+    formData.append("resource",JSON.stringify(resource));
 
-
+    const response = await axios.post("http://localhost:3000/api/upload",formData,
+      {
+        headers: {"Content-Type": "multipart/form-data"}
+      }
+    ); //use post route for resource//
+    const savedResource = response.data;
+    setResources((prev) => [savedResource, ...prev]);
     cancelForm();
   };
 

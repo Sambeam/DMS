@@ -5,7 +5,7 @@ import apiRoutes from "./routes/ModelRoutes.js";
 import ExportRoutes from "./routes/export.js";
 import {User} from "./models/models.js";
 import cors from "cors";
-//import generateQuizRouter from "./generateQuiz.js";
+import generateQuizRouter from "./generateQuiz.js";
 
 
 dotenv.config();
@@ -14,7 +14,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-//app.use("/api", generateQuizRouter);
+app.use("/api", generateQuizRouter);
 
 connectDB();
 
@@ -41,6 +41,9 @@ app.use("/api", apiRoutes);
 
 //XML export routes//
 app.use("/api/export", ExportRoutes);
+
+//uploads route//
+app.use("/uploads", express.static("uploads"));
 
 const PORT = process.env.PORT || 3000;
 

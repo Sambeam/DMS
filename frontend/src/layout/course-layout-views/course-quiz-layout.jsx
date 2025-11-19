@@ -142,7 +142,7 @@ async function callGenerateQuizAPI(file , numQuestions, setLoading){
 
   //make HTTP request with quiz arguments//
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/generateQuiz`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/generateQuiz`, {
       method: "POST",
       body: formData,
     });

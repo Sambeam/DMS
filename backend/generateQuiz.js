@@ -1,26 +1,46 @@
 import express from "express";
 import multer from "multer";
 import fs from "fs";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import "pdfjs-dist/legacy/build/pdf.worker.js";
 
+//router and upload direcotry//
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
+//extracting text from pdf file//
+async function extractPdfText(buffer) {
+  const uint8 = new Uint8Array(buffer);
+  const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
 
-// POST /generateQuiz (upload PDF + numQ)
+  let text = "";
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((item) => item.str).join(" ") + "\n";
+  }
+
+  return text;
+}
+
+//new route to bring file to generateQuiz//
 router.post("/generateQuiz", upload.single("file"), async (req, res) => {
-  alert("in");
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  }); 
   try {
     const { numQ } = req.body;
     const filePath = req.file.path;
 
-    const fileBuffer = fs.readFileSync(filePath); // Read uploaded PDF
-
+    const fileBuffer = fs.readFileSync(filePath);
+    const pdfText = await extractPdfText(fileBuffer);
     const prompt = `
 You are an educator. Generate a quiz using the given material.
+====================
+${pdfText}
+====================
 The rules are:
 - the quiz must have exactly ${numQ} questions
 - each question must be multiple choice with 4 options
@@ -39,30 +59,24 @@ The rules are:
     ]
 }`;
 
-    const response = await client.messages.create({
-      model: "claude-3-5-sonnet-latest",
-      max_tokens: 4000,
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_file",
-              media_type: "application/pdf",
-              data: fileBuffer.toString("base64")
-            },
-            {
-              type: "text",
-              text: prompt
-            }
-          ]
-        }
+        { role: "system", content: "You generate quizzes in strict JSON format." },
+        { role: "user", content: prompt }
       ]
     });
 
-    const quizText = response.content[0].text;
-    const quizJSON = JSON.parse(quizText);
-
+    const quizText = response.choices[0].message.content;
+    let quizJSON;
+    try{
+      quizJSON = JSON.parse(quizText);
+    }catch(error){
+       return res.status(500).json({
+        error: "Failed to parse JSON. Model output:",
+        raw_output: quizText
+      });
+    }
     res.json({ success: true, quiz: quizJSON });
 
     fs.unlinkSync(filePath); 
