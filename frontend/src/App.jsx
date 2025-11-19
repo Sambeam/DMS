@@ -569,11 +569,17 @@ const StudyHubApp = () => {
     courseFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleDeleteCourse = (courseId) => {
-    setCourses((prev) => prev.filter((course) => course.id !== courseId));
-    setClasses((prev) => prev.filter((session) => session.courseId !== courseId));
+  const handleDeleteCourse = async (courseId, course) => {
+    try{
+      const response = await axios.delete(`http://localhost:3000/api/course/${course._id}`);
+      console.log("Response from backend:",response.data);
+  
+      setCourses((prev) => prev.filter((course) => course._id !== courseId));
     if (editingCourseId === courseId) {
       resetCourseForm();
+    }
+    } catch (error){
+      console.log("Cannot removed the selected course",error);
     }
   };
 
@@ -1052,7 +1058,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteCourse(course.id)}
+                      onClick={() => handleDeleteCourse(course._id, course)}
                       className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />

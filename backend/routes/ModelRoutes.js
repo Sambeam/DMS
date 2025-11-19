@@ -18,7 +18,7 @@ import {loginAttempt} from "../controllers/AuthenticationController.js";
 
 const router = express.Router();
 
-const models = ["user", "course","coursework","quiz","question","event","eventtag","studysection", "studynote","notepage","aiquery","performancestat"];
+const models = ["user", "course","coursework","quiz","question","resource","event","eventtag","studysection", "studynote","notepage","aiquery","performancestat"];
 
 const zod_schemas = {
     user: Schemas.UserSchema,
@@ -26,6 +26,7 @@ const zod_schemas = {
     coursework: Schemas.CourseWorkSchema,
     quiz: Schemas.QuizSchema,
     question: Schemas.QuestionSchema,
+    resource: Schemas.ResourceSchema,
     event: Schemas.CalendarEventSchema,
     studysection: Schemas.StudySectionSchema,
     studynote: Schemas.StudyNoteSchema,
@@ -42,6 +43,7 @@ const create_controllers = {
     coursework: controllers.createCourseWork,
     quiz: controllers.createQuiz,
     question: controllers.createQuestion,
+    resource: controllers.createResource,
     event: controllers.createEvent,
     eventtag: controllers.createEventTag,
     studysection: controllers.createStudySection,
@@ -138,8 +140,6 @@ router.get("/aiquery/user/:userId", validateParams(Schemas.makeIdSchema("userId"
 
 //for performance stat//
 router.get("/performance/user/:userId", validateParams(Schemas.makeIdSchema("userId")), controllers.getPerformanceStats);
-router.post("/notes/state", controllers.upsertNoteCanvasState);
-router.get("/notes/state/:userId", validateParams(Schemas.makeIdSchema("userId")), controllers.getNoteCanvasState);
 
 //for holiday//
 router.post("/sync",validate(Schemas.HolidaySchema), async (req ,res)=>{
@@ -233,7 +233,7 @@ router.put("/eventtag/:tagId", validateParams(Schemas.makeIdSchema("tagId")), va
 
 //added delete for selected model//
 //for course//
-router.delete("/course/:courseId", validateParams(Schemas.makeIdSchema("courseId")), deleteControllers.deleteCourse);
+router.delete("/course/:courseId",deleteControllers.deleteCourse);
 
 //for course work//
 router.delete("/coursework/:courseWorkId", validateParams(Schemas.makeIdSchema("courseWorkId")), deleteControllers.deleteCourseWork);
