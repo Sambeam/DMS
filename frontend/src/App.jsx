@@ -308,7 +308,7 @@ const StudyHubApp = () => {
     } catch (err) {
       console.error("Failed to load courses", err);
     }
-  };
+  }
 
   loadCourses();
 }, [user]);
@@ -1080,7 +1080,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                     localStorage.setItem("selectedCourse", JSON.stringify(course));
                   }} 
                     className="w-full text-left bg-gray-50 hover:bg-gray-100 text-blue-600 px-3 py-2 rounded-lg transition-colors">
-                    {course.name}
+                    {course.course_name}
                   </button>
                 </h4>
                   <div className="flex items-center text-sm text-gray-600 mb-2">

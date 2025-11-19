@@ -21,8 +21,8 @@ export const CourseSchema = z.object({
 export const CourseWorkSchema = z.object({
     course_id: z.string().min(1),
     cw_name: z.string().min(1),
-    cw_grade: z.number().min(1),
-    cw_weight: z.number().min(1)
+    cw_grade: z.number().min(0).max(100),
+    cw_weight: z.number().min(0).max(1)
 });
 
 export const QuizSchema = z.object({
