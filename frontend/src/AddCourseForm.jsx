@@ -13,6 +13,20 @@ function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, re
         color: courseColorPalette[0],
       });
 
+      useEffect(() => {
+  if (!editingCourseId) {
+    setCourseForm({
+      code: "",
+      name: "",
+      instructor: "",
+      credits: "3",
+      semester: "Fall 2024",
+      description: "",
+      color: courseColorPalette[0],
+    });
+  }
+}, [editingCourseId]);
+
     const handleCourseInputChange = (e) => {
     const { name, value } = e.target;
     setCourseForm((prev) => ({
@@ -29,7 +43,7 @@ function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, re
       }
       const payload = {
         user_id: user._id,
-        code: courseForm.code.trim(),
+        course_code: courseForm.code.trim(),
         course_name: courseForm.name.trim(),
         instructor: courseForm.instructor.trim() || "TBD",
         credit: Number(courseForm.credits) || 0,
@@ -47,7 +61,7 @@ function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, re
       }catch(error){
         console.error("Add course error:", error.response?.data || error.message);
         alert("Failed to save course.");
-      }s
+      }
     };
     return(
         <form onSubmit={handleCourseSubmit} className="space-y-4">

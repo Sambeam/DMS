@@ -551,6 +551,17 @@ const StudyHubApp = () => {
       : 0;
 
   // ----- ACTIONS -----
+
+        const [courseForm, setCourseForm] = useState({
+          code: "",
+          name: "",
+          instructor: "",
+          credits: "3",
+          semester: "Fall 2024",
+          description: "",
+          color: courseColorPalette[0],
+        });
+  
   const resetCourseForm = () => {
     setCourseForm({
       code: "",
@@ -658,21 +669,33 @@ const StudyHubApp = () => {
   };
 
   const handleAddCourse = async(e) => {
-    /*const newCourseObj ={
+    const newCourseObj ={
       user_id: user._id,
-      course_code: courseFormData.course_code,
+      course_code: courseFormData.code.trim(),
       course_name: courseFormData.course_name,
       instructor: courseFormData.instructor || "TBD",
-      credit: courseFormData.credit || 0,
-      description: courseFormDatae.description || "",
+      credit: Number(courseFormData.credit) || 0,
+      description: courseFormData.description || "",
       color: courseFormData.color
     };
     try{
       const response = await axios.post("http://localhost:3000/api/course", newCourseObj);
       const savedCourse = response.data;
-    }catch(error){
+      alert("successful");
 
-    }*/
+      setCourses((prev) => [savedCourses, ...prev]);
+      setCurrentPage("courses");
+      resetCourseForm();
+      setTimeout(() => {
+      courseFormRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+    }catch(error){
+      console.error("Error adding course:", error.response?.data || error.message);
+      alert("Cannot add course");
+    }
 
     setCurrentPage("courses");
     resetCourseForm();
@@ -996,15 +1019,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
       orange: "from-orange-500 to-orange-600",
     };
 
-      const [courseForm, setCourseForm] = useState({
-    code: "",
-    name: "",
-    instructor: "",
-    credits: "3",
-    semester: "Fall 2024",
-    description: "",
-    color: courseColorPalette[0],
-  });
+
 
     return (
       <div className="max-w-7xl w-full">
