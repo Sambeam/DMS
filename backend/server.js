@@ -7,21 +7,21 @@ import {User} from "./models/models.js";
 import cors from "cors";
 import generateQuizRouter from "./generateQuiz.js";
 
-
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+app.use(express.json()); //enable reading of JSON obj from request and turn to req.body//
 app.use(cors());
-
-app.use("/api", generateQuizRouter);
+app.use("/api", generateQuizRouter); //route to quiz generation script//
 
 connectDB();
 
+//test backend//
 app.get("/", (req, res) => {
   res.send("Backend is running");
 });
 
+//connect to mongo db//
 app.get("/api/test-mongo", async (req, res) => {
   try {
     const u = await User.create({
