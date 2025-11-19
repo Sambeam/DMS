@@ -5,6 +5,7 @@ import express from "express";
 import * as controllers from "../controllers/ModelController.js";
 import * as updateControllers from "../controllers/PutControllers.js";
 import * as deleteControllers from "../controllers/DeleteControllers.js";
+import { getNoteCanvasState, saveNoteCanvasState } from "../controllers/NoteCanvasController.js";
 import axios from "axios";
 import { Holiday } from "../models/models.js"
 import {validate} from "../DataValidation/ValidateEntry.js";
@@ -33,6 +34,7 @@ const zod_schemas = {
     aiquery: Schemas.AIQuerySchema,
     performancestat: Schemas.PerformanceStatSchema,
     holiday: Schemas.HolidaySchema,
+    notecanvas: Schemas.NoteCanvasStateSchema,
 };
 
 const create_controllers = {
@@ -109,6 +111,10 @@ router.get("/aiquery/user/:userId", validateParams(Schemas.makeIdSchema("userId"
 
 //for performance stat//
 router.get("/performance/user/:userId", validateParams(Schemas.makeIdSchema("userId")), controllers.getPerformanceStats);
+
+// for note canvas state //
+router.get("/note-canvas/:userId", validateParams(Schemas.makeIdSchema("userId")), getNoteCanvasState);
+router.post("/note-canvas", validate(Schemas.NoteCanvasStateSchema), saveNoteCanvasState);
 
 //for holiday//
 router.post("/sync",validate(Schemas.HolidaySchema), async (req ,res)=>{

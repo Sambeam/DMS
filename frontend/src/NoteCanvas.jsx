@@ -7,15 +7,30 @@ import {
 import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import axios from "axios";
 
 // Explicitly reference the worker that Vite bundles for pdf.js
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const MAX_WIDTH = 1000;
+const DEFAULT_API_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const createEmptyPage = (id = Date.now()) => ({ id, slides: [], lines: [], textBoxes: [] });
+const computeNextIdFromPages = (pages = []) => {
+  const ids = [];
+  pages.forEach((page) => {
+    ids.push(Number(page.id));
+    page.slides?.forEach((slide) => ids.push(Number(slide.id)));
+    page.lines?.forEach((line) => ids.push(Number(line.id)));
+    page.textBoxes?.forEach((box) => ids.push(Number(box.id)));
+  });
+  const numericIds = ids.filter((val) => Number.isFinite(val));
+  return numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1;
+};
 
-export default function NoteCanvas() {
+export default function NoteCanvas({ userId, apiBaseUrl = DEFAULT_API_BASE }) {
+  const API_BASE = (apiBaseUrl ?? DEFAULT_API_BASE).replace(/\/$/, "");
   const stageRefs = useRef([]);
-  const [pages, setPages] = useState([]);
+  const [pages, setPages] = useState([createEmptyPage(0)]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [tool, setTool] = useState("move");
   const [drawingColor, setDrawingColor] = useState("#000000");
@@ -28,6 +43,54 @@ export default function NoteCanvas() {
   const [addingText, setAddingText] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [loadingState, setLoadingState] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    if (!userId) {
+      setPages([createEmptyPage(0)]);
+      setCurrentPageIndex(0);
+      setNextId(1);
+      return;
+    }
+    let ignore = false;
+    const fetchState = async () => {
+      setLoadingState(true);
+      setLoadError("");
+      try {
+        const response = await axios.get(`${API_BASE}/api/note-canvas/${userId}`);
+        if (ignore) return;
+        const payload = response.data?.data;
+        if (payload?.pages?.length) {
+          setPages(payload.pages);
+          setCurrentPageIndex(Math.min(payload.currentPageIndex ?? 0, payload.pages.length - 1));
+          setNextId(payload.nextId ?? computeNextIdFromPages(payload.pages));
+        } else {
+          setPages([createEmptyPage(0)]);
+          setCurrentPageIndex(0);
+          setNextId(1);
+        }
+      } catch (error) {
+        if (!ignore) {
+          console.error("Failed to load note canvas state", error);
+          setLoadError("Unable to load your saved notes.");
+          setPages([createEmptyPage(0)]);
+          setCurrentPageIndex(0);
+          setNextId(1);
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingState(false);
+        }
+      }
+    };
+    fetchState();
+    return () => {
+      ignore = true;
+    };
+  }, [userId, API_BASE]);
 
   const hexToRGBA = (hex, alpha) => {
     let r = 0, g = 0, b = 0;
@@ -152,9 +215,13 @@ export default function NoteCanvas() {
   };
 
   const addPage = () => {
-    setPages(prev => [...prev, { id: nextId, slides: [], lines: [], textBoxes: [] }]);
-    setNextId(prev => prev + 1);
-    setCurrentPageIndex(pages.length);
+    const newPage = { id: nextId, slides: [], lines: [], textBoxes: [] };
+    setPages((prev) => {
+      const updated = [...prev, newPage];
+      setCurrentPageIndex(updated.length - 1);
+      return updated;
+    });
+    setNextId((prev) => prev + 1);
   };
 
   const deletePage = () => {
@@ -195,20 +262,20 @@ export default function NoteCanvas() {
           yOffset += scaledViewport.height + 20;
         }
 
-        setNextId(prev => prev + pdf.numPages);
-        setPages(prev => {
+        setPages((prev) => {
           const newPages = [...prev, { id: nextId, slides, lines: [], textBoxes: [] }];
           setCurrentPageIndex(newPages.length - 1);
           return newPages;
         });
+        setNextId((prev) => prev + pdf.numPages + 1);
       } else if (file.type.startsWith("image/")) {
         const dataURL = URL.createObjectURL(file);
-        setPages(prev => {
+        setPages((prev) => {
           const newPages = [...prev, { id: nextId, slides: [{ id: nextId, src: dataURL, width: MAX_WIDTH, height: 1000, yOffset: 0 }], lines: [], textBoxes: [] }];
           setCurrentPageIndex(newPages.length - 1);
           return newPages;
         });
-        setNextId(prev => prev + 1);
+        setNextId((prev) => prev + 1);
       }
     }
 
@@ -217,6 +284,29 @@ export default function NoteCanvas() {
 
   const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
   const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.2));
+
+  const handleSaveWorkspace = async () => {
+    if (!userId) return;
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      await axios.post(`${API_BASE}/api/note-canvas`, {
+        userId,
+        data: {
+          pages,
+          nextId,
+          currentPageIndex,
+        },
+      });
+      setSaveMessage("Saved");
+    } catch (error) {
+      console.error("Failed to save note canvas state", error);
+      setSaveMessage("Save failed");
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(""), 4000);
+    }
+  };
 
   const savePageAsPDF = async () => {
     const stage = stageRefs.current[currentPageIndex];
@@ -233,11 +323,21 @@ export default function NoteCanvas() {
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       {/* Pages toolbar */}
-      <div style={{ position: "sticky", top: 0, zIndex: 25, backgroundColor: "#ddd", padding: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 25, backgroundColor: "#ddd", padding: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={addPage}>Add Page</button>
         <button onClick={deletePage}>Delete Page</button>
         <button onClick={savePageAsPDF}>Save Page as PDF</button>
-        {pages.map((p, idx) => <button key={p.id} onClick={() => setCurrentPageIndex(idx)} style={{ fontWeight: idx === currentPageIndex ? "bold" : "normal" }}>{idx + 1}</button>)}
+        <button onClick={handleSaveWorkspace} disabled={isSaving || loadingState}>
+          {isSaving ? "Saving..." : "Save Workspace"}
+        </button>
+        {pages.map((p, idx) => (
+          <button key={p.id} onClick={() => setCurrentPageIndex(idx)} style={{ fontWeight: idx === currentPageIndex ? "bold" : "normal" }}>
+            {idx + 1}
+          </button>
+        ))}
+        <span style={{ marginLeft: "auto", fontSize: 12, color: loadError ? "#b91c1c" : "#1f2937" }}>
+          {loadingState ? "Loading..." : loadError || saveMessage}
+        </span>
       </div>
 
       {/* Main toolbar */}
@@ -259,11 +359,15 @@ export default function NoteCanvas() {
 
       {/* Pages */}
       <div style={containerStyle}>
-        {pages.map((page, idx) => (
-          <div key={page.id} style={{ marginBottom: 50, display: idx === currentPageIndex ? "block" : "none" }}>
+        {pages.map((page, idx) => {
+          const stageHeight = page.slides.length
+            ? Math.max(...page.slides.map((s) => s.height + s.yOffset + 20), window.innerHeight)
+            : window.innerHeight;
+          return (
+            <div key={page.id} style={{ marginBottom: 50, display: idx === currentPageIndex ? "block" : "none" }}>
             <Stage
               width={window.innerWidth}
-              height={Math.max(...page.slides.map(s => s.height + s.yOffset + 20), window.innerHeight)}
+              height={stageHeight}
               onMouseDown={() => handleMouseDown(idx)}
               onMouseMove={() => handleMouseMove(idx)}
               onMouseUp={handleMouseUp}
@@ -278,8 +382,9 @@ export default function NoteCanvas() {
               {(tool === "draw" || tool === "highlighter" || tool === "eraser") &&
                 <Layer><Circle x={cursorPos.x} y={cursorPos.y} radius={drawingSize / 2} stroke={tool === "eraser" ? "#000" : drawingColor} strokeWidth={1} /></Layer>}
             </Stage>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

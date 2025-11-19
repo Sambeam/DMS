@@ -106,6 +106,11 @@ export const HolidaySchema = z.object({
     type: z.string().optional()
 });
 
+export const NoteCanvasStateSchema = z.object({
+    userId: z.string().min(1),
+    data: z.any(),
+});
+
 //validation rule for getting//
 export const makeIdSchema = (paramName) =>
 z.object({

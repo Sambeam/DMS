@@ -495,6 +495,16 @@ const StudyHubApp = () => {
     assignments.length > 0
       ? Math.round((completedAssignments / assignments.length) * 100)
       : 0;
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const upcomingDeadlineList = assignments
+    .filter((assignment) => assignment?.dueDate && assignment.status !== "completed")
+    .map((assignment) => {
+      const dueDateObj = new Date(assignment.dueDate);
+      if (Number.isNaN(dueDateObj.getTime())) return null;
+      return { ...assignment, dueDateObj };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dueDateObj - b.dueDateObj);
 
   // ----- ACTIONS -----
   const resetCourseForm = () => {
@@ -775,7 +785,20 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
 
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const todayName = days[new Date().getDay()];
-    const todaySchedule = classes.filter((c) => c.dayOfWeek === todayName);
+    const todaySchedule = classes
+      .filter((session) => session.dayOfWeek === todayName)
+      .map((session) => ({
+        ...session,
+        start: session.startTime ?? "",
+        end: session.endTime ?? "",
+      }))
+      .sort((a, b) => {
+        const parse = (value) => {
+          const [hours = "0", minutes = "0"] = value.split(":");
+          return Number(hours) * 60 + Number(minutes);
+        };
+        return parse(a.start) - parse(b.start);
+      });
 
     return (
       <div className="max-w-7xl mx-auto">
@@ -815,7 +838,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               </button>
             </div>
 
-            {overdueAssignments === 0 ? (
+            {upcomingDeadlineList.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                   <Calendar className="w-10 h-10 text-gray-400" />
@@ -825,21 +848,50 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               </div>
             ) : (
               <div className="space-y-3">
-                {assignments
-                  .filter((a) => a.status === "overdue")
-                  .slice(0, 3)
-                  .map((a) => {
-                    const course = courses.find((c) => c.id === a.courseId);
-                    return (
-                      <div key={a.id} className="border-l-4 border-red-500 bg-red-50 rounded-r-lg p-4">
-                        <h4 className="font-semibold text-gray-900 mb-2">{a.title}</h4>
-                        <div className="flex items-center text-sm text-gray-600">
-                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs mr-2">{course?.code}</span>
-                          <span className="text-red-600">Overdue</span>
+                {upcomingDeadlineList.map((assignment) => {
+                  const course = courses.find((c) => c.id === assignment.courseId);
+                  const isOverdue = assignment.dueDateObj < startOfToday;
+                  return (
+                    <div
+                      key={assignment.id}
+                      className={`border-l-4 rounded-r-lg p-4 flex items-center justify-between ${
+                        isOverdue ? "border-red-500 bg-red-50" : "border-blue-500 bg-blue-50"
+                      }`}
+                    >
+                      <div>
+                        <h4 className="font-semibold text-gray-900 mb-1">{assignment.title}</h4>
+                        <p className="text-sm text-gray-600 mb-2">{assignment.description || "No description provided."}</p>
+                        <div className="flex flex-wrap gap-2 text-xs text-gray-700">
+                          {course?.code && (
+                            <span className="px-2 py-1 bg-white/80 rounded border border-white/70">{course.code}</span>
+                          )}
+                          {assignment.priority && (
+                            <span className="px-2 py-1 bg-white/80 rounded border border-white/70 capitalize">
+                              {assignment.priority} priority
+                            </span>
+                          )}
+                          <span className="px-2 py-1 bg-white/80 rounded border border-white/70 capitalize">
+                            {assignment.type ?? "assignment"}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="text-right text-sm font-semibold text-gray-900">
+                        {isOverdue ? (
+                          <span className="text-red-600">Overdue</span>
+                        ) : (
+                          <span>
+                            Due{" "}
+                            {assignment.dueDateObj.toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        )}
+                        <p className="text-xs text-gray-500">{assignment.dueDate}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -855,21 +907,23 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               </div>
             ) : (
               <div className="space-y-3">
-                {todaySchedule.map((c) => {
-                  const course = courses.find((x) => x.id === c.courseId);
+                {todaySchedule.map((session) => {
+                  const course = courses.find((x) => x.id === session.courseId);
                   return (
-                    <div key={c.id} className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4">
+                    <div key={session.id} className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-semibold text-gray-900">{course?.name}</h4>
-                        <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">{c.type}</span>
+                        <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded capitalize">
+                          {session.type}
+                        </span>
                       </div>
                       <div className="flex items-center text-sm text-gray-600 mb-1">
                         <Clock className="w-4 h-4 mr-1" />
-                        {c.startTime} - {c.endTime}
+                        {session.startTime} - {session.endTime}
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
                         <CalendarDays className="w-4 h-4 mr-1" />
-                        {c.location}
+                        {session.location || "No location set"}
                       </div>
                     </div>
                   );
@@ -885,16 +939,11 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               <TrendingUp className="w-5 h-5 text-green-500" />
               <h3 className="text-lg font-semibold text-gray-900">Study Statistics</h3>
             </div>
-            <div className="h-48 flex items-end justify-between space-x-4">
-              {["Wed", "Thu", "Fri", "Sat", "Sun", "Mon", "Tue"].map((day) => (
-                <div key={day} className="flex-1 flex flex-col items-center">
-                  <div className="w-full bg-gray-100 rounded-t-lg" style={{ height: "120px" }}>
-                    <div className="w-full bg-blue-500 rounded-t-lg" style={{ height: "0%" }} />
-                  </div>
-                  <span className="text-xs text-gray-500 mt-2">{day}</span>
-                </div>
-              ))}
-            </div>
+            <StudyStatistics
+              studySessions={studySessions}
+              courses={courses}
+              today={today}
+            />
           </div>
 
           {/* Quick Actions */}
@@ -1915,6 +1964,106 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     );
   };
 
+  const StudyStatistics = ({ studySessions, courses, today }) => {
+    const findCourse = (id) => courses.find((course) => course.id === id);
+    const todayISO = today.toISOString().split("T")[0];
+    const todaySessions = studySessions.filter((session) => session.date === todayISO);
+    const totalTodayMinutes = todaySessions.reduce((total, session) => total + session.duration, 0);
+
+    const minutesToHoursMinutes = (minutes) => {
+      const hours = Math.floor(minutes / 60);
+      const remainderMinutes = minutes % 60;
+      return { hours, remainderMinutes, formatted: `${hours}h ${remainderMinutes}m` };
+    };
+
+    const weeklyData = (() => {
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - 6);
+      const data = [];
+
+      for (let i = 0; i < 7; i++) {
+        const current = new Date(weekStart);
+        current.setDate(weekStart.getDate() + i);
+        const currentISO = current.toISOString().split("T")[0];
+        const sessions = studySessions.filter((session) => session.date === currentISO);
+        const dayMinutes = sessions.reduce((total, session) => total + session.duration, 0);
+        data.push({
+          date: currentISO,
+          label: current.toLocaleDateString(undefined, { weekday: "short" }),
+          minutes: dayMinutes,
+        });
+      }
+      return data;
+    })();
+
+    const totalWeeklyMinutes = weeklyData.reduce((total, day) => total + day.minutes, 0);
+
+    const todaySessionsByCourse = Object.values(
+      todaySessions.reduce((acc, session) => {
+        const course = findCourse(session.courseId);
+        const key = course?.id ?? "unknown";
+        if (!acc[key]) {
+          acc[key] = {
+            courseName: course?.name ?? "Unknown course",
+            minutes: 0,
+          };
+        }
+        acc[key].minutes += session.duration;
+        return acc;
+      }, {})
+    ).sort((a, b) => b.minutes - a.minutes);
+
+    return (
+      <div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
+          <div>
+            <p className="text-sm text-gray-500">Today</p>
+            <p className="text-2xl font-semibold text-gray-900">{minutesToHoursMinutes(totalTodayMinutes).formatted}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">This week</p>
+            <p className="text-lg font-semibold text-gray-900">{minutesToHoursMinutes(totalWeeklyMinutes).formatted}</p>
+          </div>
+        </div>
+
+        <div className="h-48 flex items-end justify-between space-x-4 mb-6">
+          {weeklyData.map((day) => {
+            const maxMinutes = Math.max(...weeklyData.map((d) => d.minutes), 1);
+            const heightPercent = Math.round((day.minutes / maxMinutes) * 100);
+            return (
+              <div key={day.date} className="flex-1 flex flex-col items-center">
+                <div className="w-full bg-gray-100 rounded-t-lg h-32 relative">
+                  <div
+                    className="w-full bg-blue-500 rounded-t-lg absolute bottom-0"
+                    style={{ height: `${heightPercent}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500 mt-2">{day.label}</span>
+                <span className="text-xs text-gray-400">{minutesToHoursMinutes(day.minutes).formatted}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="border rounded-lg p-4 bg-gray-50">
+          <h4 className="font-semibold text-gray-900 mb-3">Today's breakdown</h4>
+          {todaySessionsByCourse.length === 0 ? (
+            <p className="text-sm text-gray-500">No study sessions logged today.</p>
+          ) : (
+            <div className="space-y-3">
+              {todaySessionsByCourse.map((entry) => (
+                <div key={entry.courseName} className="flex items-center justify-between text-sm text-gray-700">
+                  <span>{entry.courseName}</span>
+                  <span>{minutesToHoursMinutes(entry.minutes).formatted}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const AISyllabusParser = () => {
     const [syllabusText, setSyllabusText] = useState("");
     const [parsedAssignments, setParsedAssignments] = useState([]);
@@ -2183,7 +2332,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
       case "notes":
         return user ? (
           <Suspense fallback={<div className="p-6 bg-white rounded-xl shadow-sm">Loading notes...</div>}>
-            <NoteCanvas />
+            <NoteCanvas userId={userId} apiBaseUrl={API_BASE_URL} />
           </Suspense>
         ) : (
           <div className="p-6 bg-white rounded-xl shadow-sm text-gray-700">
@@ -2266,6 +2415,11 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
             {menuItems.map((item) => {
               const Icon = item.icon;
               const active = currentPage === item.id;
+              const baseClasses =
+                "group w-full flex items-center px-4 py-3 rounded-xl border transition-colors duration-200 text-left";
+              const activeClasses = "bg-blue-600 text-white border-blue-600 shadow-lg";
+              const inactiveClasses =
+                "bg-white text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600";
               return (
                 <button
                   key={item.id}
@@ -2273,11 +2427,13 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                     setCurrentPage(item.id);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center px-3 py-2 rounded-lg text-left transition-colors ${
-                    active ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-700"
-                  }`}
+                  className={`${baseClasses} ${active ? activeClasses : inactiveClasses}`}
                 >
-                  <Icon className={`w-5 h-5 mr-3 ${active ? "text-blue-600" : "text-gray-500"}`} />
+                  <Icon
+                    className={`w-5 h-5 mr-3 transition-colors ${
+                      active ? "text-white" : "text-blue-500 group-hover:text-white"
+                    }`}
+                  />
                   <span className="font-medium">{item.label}</span>
                 </button>
               );
