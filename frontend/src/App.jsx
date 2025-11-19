@@ -297,37 +297,21 @@ const StudyHubApp = () => {
 
   // ----- DATA -----
   const [courses, setCourses] = useState([]);
-    /*{
-      id: "1",
-      code: "MATH201",
-      name: "Calculus II",
-      instructor: "Prof. Michael Chen",
-      credits: 4,
-      color: "purple",
-      semester: "Fall 2024",
-      description: "Advanced integration techniques and series",
-    },
-    {
-      id: "2",
-      code: "CS101",
-      name: "Introduction to Computer Science",
-      instructor: "Dr. Sarah Johnson",
-      credits: 4,
-      color: "blue",
-      semester: "Fall 2024",
-      description: "Fundamentals of programming and computational thinking",
-    },
-    {
-      id: "3",
-      code: "PHYS150",
-      name: "Physics for Engineers",
-      instructor: "Dr. Emily Rodriguez",
-      credits: 3,
-      color: "pink",
-      semester: "Fall 2024",
-      description: "Classical mechanics and thermodynamics",
-    },
-  ]);*/
+
+  useEffect(()=>{
+    if(!user||!user._id)return;
+    const loadCourses = async () => {
+    try {
+      const res = await axios.get(`http://localhost:3000/api/course/user/${user._id}`);
+      setCourses(res.data);
+      alert("got course");
+    } catch (err) {
+      console.error("Failed to load courses", err);
+    }
+  };
+
+  loadCourses();
+}, [user]);
 
   const [assignments, setAssignments] = useState([
     {
@@ -552,9 +536,9 @@ const StudyHubApp = () => {
 
   // ----- ACTIONS -----
 
-        const [courseForm, setCourseForm] = useState({
-          code: "",
-          name: "",
+    const [courseForm, setCourseForm] = useState({
+      code: "",
+      name: "",
           instructor: "",
           credits: "3",
           semester: "Fall 2024",
