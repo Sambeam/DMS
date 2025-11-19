@@ -12,6 +12,7 @@ const client = new Anthropic({
 
 // POST /generateQuiz (upload PDF + numQ)
 router.post("/generateQuiz", upload.single("file"), async (req, res) => {
+  alert("in");
   try {
     const { numQ } = req.body;
     const filePath = req.file.path;

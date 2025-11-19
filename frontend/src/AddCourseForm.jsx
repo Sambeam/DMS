@@ -3,17 +3,17 @@ import axios from "axios";
 
 
 function AddCourseForm({user,courseColorPalette, editingCourseId, setCourses, resetCourseForm}){
-      const [courseForm, setCourseForm] = useState({
-        code: "",
-        name: "",
-        instructor: "",
-        credits: "3",
-        semester: "Fall 2024",
-        description: "",
-        color: courseColorPalette[0],
-      });
+  const [courseForm, setCourseForm] = useState({
+    code: "",
+    name: "",
+    instructor: "",
+    credits: "3",
+    semester: "Fall 2024",
+    description: "",
+    color: courseColorPalette[0],
+  });
 
-      useEffect(() => {
+  useEffect(() => {
   if (!editingCourseId) {
     setCourseForm({
       code: "",
