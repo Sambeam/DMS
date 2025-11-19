@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import {
   Calendar,
   BookOpen,
@@ -30,7 +30,8 @@ import Quiz from "./layout/quiz-layout.jsx";
 import AuthPage from "./Authentication/AuthPage.jsx"
 import LandingPage from "./Authentication/LandingPage.jsx"
 import axios from "axios";
-import AddCourseForm from "./AddCourseForm.jsx";
+
+const NoteCanvas = lazy(() => import("./NoteCanvas.jsx"));
 
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -103,6 +104,7 @@ const StudyHubApp = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [user, setUser] = useState(null);
+  const userId = user?._id ?? user?.id ?? user?.user_id ?? null;
   const [authError, setAuthError] = useState("");
   const [googleReady, setGoogleReady] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -119,16 +121,16 @@ const StudyHubApp = () => {
   const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
   const [authLoading, setAuthLoading] = useState(false);
   const [stateLoading, setStateLoading] = useState(false);
-    const [stateError, setStateError] = useState("");
-    const [stateHydrated, setStateHydrated] = useState(false);
-    const userId = user?._id;
+  const [stateError, setStateError] = useState("");
+  const [stateHydrated, setStateHydrated] = useState(false);
+  
 
   const handleAuthInput = (e) => {
     const { name, value } = e.target;
     setAuthForm((prev) => ({ ...prev, [name]: value }));
   };
 
-    const fetchUserByEmail = useCallback(async (email) => {
+  const fetchUserByEmail = useCallback(async (email) => {
     const response = await axios.get(`${API_BASE_URL}/api/user/email/${encodeURIComponent(email)}`);
     return response.data;
   }, []);
@@ -157,52 +159,179 @@ const StudyHubApp = () => {
   );
 
   const handleManualAuth = async (e) => {
-  e.preventDefault();
-  setAuthError("");
-
-  if (!authForm.email || !authForm.password ||
-      (authScreen === "signup" && !authForm.name)) 
-  {
-    setAuthError("Please fill in all required fields.");
-    return;
-  }
-
-  setAuthLoading(true);
-
-  try {
-    let userPayload;
-    let endpoint;
-
-    if (authScreen === "signup") {
-      userPayload = {
-        username: authForm.name,
-        email: authForm.email,
-        pswd_hash: authForm.password
-      };
-      endpoint = "http://localhost:3000/api/user";
-    } 
-    else {
-      userPayload = {
-        email: authForm.email,
-        password: authForm.password
-      };
-      endpoint = "http://localhost:3000/api/user/login";
+    e.preventDefault();
+    setAuthError("");
+    if (!authForm.email || !authForm.password || (authScreen === "signup" && !authForm.name)) {
+      setAuthError("Please fill in all required fields.");
+      return;
     }
+    setAuthLoading(true);
+    try {
+      let response;
+      if (authScreen === "signup") {
+        const newUserPayload = {
+          username: authForm.name,
+          email: authForm.email,
+          pswd_hash: authForm.password,
+        };
+        response = await axios.post(`${API_BASE_URL}/api/user`, newUserPayload);
+      } else {
+        response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
+          email: authForm.email,
+          password: authForm.password,
+        });
+      }
+      const savedUser = formatUserForClient(response.data);
+      setUser(savedUser);
+      setAuthForm({ name: "", email: "", password: "" });
+      setAuthScreen("landing");
+    } catch (error) {
+      console.error("Authentication error:", error);
+      const fallback = authScreen === "signup" ? "Registration failed." : "Invalid email or password.";
+      setAuthError(error.response?.data?.error ?? fallback);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
-    const response = await axios.post(endpoint, userPayload);
-    const savedUser = response.data;
 
-    setUser(savedUser);
+  // ----- DATA -----
+  const [courses, setCourses] = useState([]);
 
-    // optional: reset UI states
-    setAuthLoading(false);
+  const [assignments, setAssignments] = useState([]);
 
-  } catch (error) {
-    console.error(error);
-    setAuthError("Authentication failed.");
-    setAuthLoading(false);
-  }
-};
+  const [classes, setClasses] = useState([]);
+
+  const today = new Date();
+  const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
+  const [calendarYear, setCalendarYear] = useState(today.getFullYear());
+  const courseColorPalette = ["purple", "blue", "pink", "green", "orange"];
+  const [courseForm, setCourseForm] = useState({
+    code: "",
+    name: "",
+    instructor: "",
+    credits: "3",
+    semester: "Fall 2024",
+    description: "",
+    color: courseColorPalette[0],
+  });
+  const [editingCourseId, setEditingCourseId] = useState(null);
+  const courseFormRef = useRef(null);
+
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [editingClassId, setEditingClassId] = useState(null);
+  const [classForm, setClassForm] = useState({
+    courseId: courses[0]?.id ?? "",
+    type: "lecture",
+    dayOfWeek: "Monday",
+    startTime: "09:00",
+    endTime: "10:00",
+    location: "",
+  });
+
+  const [holidays, setHolidays] = useState([]);
+  const [holidayError, setHolidayError] = useState("");
+  const [holidaysLoading, setHolidaysLoading] = useState(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const buildAssignmentForm = () => ({
+    courseId: courses[0]?.id ?? "",
+    title: "",
+    description: "",
+    dueDate: new Date().toISOString().split("T")[0],
+    priority: "medium",
+    status: "not_started",
+    type: "assignment",
+    weight: 5,
+  });
+  const [assignmentForm, setAssignmentForm] = useState(buildAssignmentForm);
+
+  const [notebooks, setNotebooks] = useState([]);
+
+  const [studySessions, setStudySessions] = useState([]);
+
+  const [timerState, setTimerState] = useState({
+    isRunning: false,
+    seconds: 0,
+    selectedCourse: null,
+  });
+
+  const applyDashboardState = useCallback(
+    (snapshot = DASHBOARD_DEFAULT_STATE) => {
+      setCourses(Array.isArray(snapshot.courses) ? snapshot.courses : []);
+      setAssignments(Array.isArray(snapshot.assignments) ? snapshot.assignments : []);
+      setClasses(Array.isArray(snapshot.classes) ? snapshot.classes : []);
+      setNotebooks(Array.isArray(snapshot.notebooks) ? snapshot.notebooks : []);
+      setStudySessions(Array.isArray(snapshot.studySessions) ? snapshot.studySessions : []);
+    },
+    []
+  );
+
+  const resetDashboardState = useCallback(() => {
+    applyDashboardState(DASHBOARD_DEFAULT_STATE);
+  }, [applyDashboardState]);
+
+  const fetchDashboardState = useCallback(
+    async (targetUserId) => {
+      setStateLoading(true);
+      setStateError("");
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/api/dashboard-state/${targetUserId}`);
+        applyDashboardState(data?.data ?? DASHBOARD_DEFAULT_STATE);
+      } catch (error) {
+        if (error.response?.status === 404) {
+          resetDashboardState();
+        } else {
+          console.error("Failed to load dashboard state:", error);
+          setStateError("Couldn't load your saved data. Changes are stored locally only.");
+          resetDashboardState();
+        }
+      } finally {
+        setStateLoading(false);
+        setStateHydrated(true);
+      }
+    },
+    [applyDashboardState, resetDashboardState]
+  );
+
+  const persistDashboardState = useCallback(
+    async (snapshot) => {
+      if (!userId) return;
+      try {
+        await axios.post(`${API_BASE_URL}/api/dashboard-state`, {
+          userId,
+          data: snapshot,
+        });
+        setStateError("");
+      } catch (error) {
+        console.error("Failed to save dashboard state:", error);
+        setStateError("Unable to save changes. We'll keep trying automatically.");
+      }
+    },
+    [userId]
+  );
+
+  useEffect(() => {
+    if (!userId) {
+      resetDashboardState();
+      setStateError("");
+      setStateHydrated(false);
+      return;
+    }
+    fetchDashboardState(userId);
+  }, [userId, fetchDashboardState, resetDashboardState]);
+
+  useEffect(() => {
+    if (!userId || !stateHydrated) return;
+    const snapshot = {
+      courses,
+      assignments,
+      classes,
+      notebooks,
+      studySessions,
+    };
+    persistDashboardState(snapshot);
+  }, [courses, assignments, classes, notebooks, studySessions, userId, stateHydrated, persistDashboardState]);
 
   const decodeCredential = (credential) => {
     try {
@@ -225,19 +354,30 @@ const StudyHubApp = () => {
       setAuthError("Unable to read Google profile. Please try again.");
       return;
     }
-    setUser({
-      name: profile.name,
-      email: profile.email,
-      picture: profile.picture,
-    });
-    if (typeof window !== "undefined") {
-      window.google?.accounts.id?.disableAutoSelect?.();
+    try {
+      const syncedUser = await ensureUserRecord({
+        name: profile.name,
+        email: profile.email,
+      });
+      const hydratedUser = formatUserForClient(syncedUser, {
+        name: profile.name ?? syncedUser?.username,
+        picture: profile.picture,
+      });
+      setUser(hydratedUser);
+      if (typeof window !== "undefined") {
+        window.google?.accounts.id?.disableAutoSelect?.();
+      }
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      setAuthError("Unable to complete Google sign-in. Please try again.");
     }
   };
 
   const handleSignOut = () => {
     setUser(null);
     setAuthError("");
+    resetDashboardState();
+    setStateHydrated(false);
     if (typeof window !== "undefined") {
       window.google?.accounts.id?.disableAutoSelect?.();
     }
@@ -295,184 +435,6 @@ const StudyHubApp = () => {
     }
   }, [googleReady, googleClientId, user, authScreen]);
 
-  // ----- DATA -----
-  const [courses, setCourses] = useState([]);
-
-  useEffect(()=>{
-    if(!user||!user._id)return;
-    const loadCourses = async () => {
-    try {
-      const res = await axios.get(`http://localhost:3000/api/course/user/${user._id}`);
-      setCourses(res.data);
-      alert("got course");
-    } catch (err) {
-      console.error("Failed to load courses", err);
-    }
-  }
-
-  loadCourses();
-}, [user]);
-
-  const [assignments, setAssignments] = useState([
-    {
-      id: "1",
-      courseId: "1",
-      title: "Calculus Midterm Exam",
-      description: "Chapters 1-5",
-      dueDate: "2024-08-01",
-      priority: "high",
-      status: "overdue",
-      type: "exam",
-      weight: 30,
-    },
-    {
-      id: "2",
-      courseId: "2",
-      title: "Programming Assignment 1",
-      description: "Build a simple calculator application",
-      dueDate: "2024-07-15",
-      priority: "high",
-      status: "overdue",
-      type: "assignment",
-      weight: 15,
-    },
-    {
-      id: "3",
-      courseId: "3",
-      title: "Lab Report 3",
-      description: "",
-      dueDate: "2024-07-20",
-      priority: "medium",
-      status: "overdue",
-      type: "lab",
-      weight: 10,
-    },
-  ]);
-
-  const [classes, setClasses] = useState([
-    {
-      id: "1",
-      courseId: "1",
-      type: "lecture",
-      dayOfWeek: "Monday",
-      startTime: "09:00",
-      endTime: "10:30",
-      location: "Room 301",
-    },
-    {
-      id: "2",
-      courseId: "1",
-      type: "lecture",
-      dayOfWeek: "Wednesday",
-      startTime: "09:00",
-      endTime: "10:30",
-      location: "Room 301",
-    },
-    {
-      id: "3",
-      courseId: "2",
-      type: "lecture",
-      dayOfWeek: "Tuesday",
-      startTime: "11:00",
-      endTime: "12:30",
-      location: "Room 205",
-    },
-    {
-      id: "4",
-      courseId: "1",
-      type: "lecture",
-      dayOfWeek: "Monday",
-      startTime: "13:00",
-      endTime: "14:30",
-      location: "Science Building A",
-    },
-    {
-      id: "5",
-      courseId: "3",
-      type: "lab",
-      dayOfWeek: "Friday",
-      startTime: "10:00",
-      endTime: "12:00",
-      location: "Physics Lab 2",
-    },
-    {
-      id: "6",
-      courseId: "2",
-      type: "tutorial",
-      dayOfWeek: "Thursday",
-      startTime: "14:00",
-      endTime: "15:00",
-      location: "Room 108",
-    },
-  ]);
-
-  const today = new Date();
-  const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
-  const [calendarYear, setCalendarYear] = useState(today.getFullYear());
-  const courseColorPalette = ["purple", "blue", "pink", "green", "orange"];
-  const [editingCourseId, setEditingCourseId] = useState(null);
-  const courseFormRef = useRef(null);
-
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [editingClassId, setEditingClassId] = useState(null);
-  const [classForm, setClassForm] = useState({
-    courseId: courses[0]?.id ?? "",
-    type: "lecture",
-    dayOfWeek: "Monday",
-    startTime: "09:00",
-    endTime: "10:00",
-    location: "",
-  });
-
-  const [holidays, setHolidays] = useState([]);
-  const [holidayError, setHolidayError] = useState("");
-  const [holidaysLoading, setHolidaysLoading] = useState(false);
-  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
-  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
-  const buildAssignmentForm = () => ({
-    courseId: courses[0]?.id ?? "",
-    title: "",
-    description: "",
-    dueDate: new Date().toISOString().split("T")[0],
-    priority: "medium",
-    status: "not_started",
-    type: "assignment",
-    weight: 5,
-  });
-  const [assignmentForm, setAssignmentForm] = useState(buildAssignmentForm);
-
-  const [notebooks, setNotebooks] = useState([
-    {
-      id: "1",
-      name: "gfdgfd",
-      color: "blue",
-      courseId: null,
-      pages: [
-        {
-          id: "1",
-          title: "Page 1",
-          content: "",
-          createdDate: "2024-10-16T22:18:00",
-        },
-      ],
-    },
-  ]);
-
-  const [studySessions, setStudySessions] = useState([
-    {
-      id: "1",
-      courseId: "2",
-      duration: 0,
-      date: new Date().toISOString().split("T")[0],
-    },
-  ]);
-
-  const [timerState, setTimerState] = useState({
-    isRunning: false,
-    seconds: 0,
-    selectedCourse: null,
-  });
-
 
   useEffect(() => {
     if (courses.length === 0) {
@@ -481,13 +443,13 @@ const StudyHubApp = () => {
       return;
     }
     setClassForm((prev) => {
-      if (prev.courseId && courses.some((course) => course._id === prev.courseId)) {
+      if (prev.courseId && courses.some((course) => course.id === prev.courseId)) {
         return prev;
       }
       return { ...prev, courseId: courses[0].id };
     });
     setAssignmentForm((prev) => {
-      if (prev.courseId && courses.some((course) => course._id === prev.courseId)) {
+      if (prev.courseId && courses.some((course) => course.id === prev.courseId)) {
         return prev;
       }
       return { ...prev, courseId: courses[0].id };
@@ -535,17 +497,6 @@ const StudyHubApp = () => {
       : 0;
 
   // ----- ACTIONS -----
-
-    const [courseForm, setCourseForm] = useState({
-      code: "",
-      name: "",
-          instructor: "",
-          credits: "3",
-          semester: "Fall 2024",
-          description: "",
-          color: courseColorPalette[0],
-        });
-  
   const resetCourseForm = () => {
     setCourseForm({
       code: "",
@@ -559,9 +510,36 @@ const StudyHubApp = () => {
     setEditingCourseId(null);
   };
 
+  const handleCourseInputChange = (e) => {
+    const { name, value } = e.target;
+    setCourseForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleCourseSubmit = (e) => {
+    e.preventDefault();
+    if (!courseForm.code.trim() || !courseForm.name.trim()) {
+      alert("Course code and name are required.");
+      return;
+    }
+    const payload = {
+      id: editingCourseId ?? Date.now().toString(),
+      code: courseForm.code.trim(),
+      name: courseForm.name.trim(),
+      instructor: courseForm.instructor.trim() || "TBD",
+      credits: Number(courseForm.credits) || 0,
+      semester: courseForm.semester.trim() || "TBD",
+      description: courseForm.description.trim(),
+      color: courseForm.color,
+    };
+    setCourses((prev) => (editingCourseId ? prev.map((c) => (c.id === editingCourseId ? payload : c)) : [payload, ...prev]));
+    resetCourseForm();
+  };
 
   const handleEditCourse = (course) => {
-    setEditingCourseId(course._id);
+    setEditingCourseId(course.id);
     setCourseForm({
       code: course.code,
       name: course.name,
@@ -575,7 +553,7 @@ const StudyHubApp = () => {
   };
 
   const handleDeleteCourse = (courseId) => {
-    setCourses((prev) => prev.filter((course) => course._id !== courseId));
+    setCourses((prev) => prev.filter((course) => course.id !== courseId));
     setClasses((prev) => prev.filter((session) => session.courseId !== courseId));
     if (editingCourseId === courseId) {
       resetCourseForm();
@@ -595,7 +573,7 @@ const StudyHubApp = () => {
     if (resetForm || !classForm.courseId) {
       setEditingClassId(null);
       setClassForm({
-        courseId: courses[0]._id,
+        courseId: courses[0]?.id ?? "",
         type: "lecture",
         dayOfWeek: "Monday",
         startTime: "09:00",
@@ -652,35 +630,7 @@ const StudyHubApp = () => {
     setIsScheduleModalOpen(true);
   };
 
-  const handleAddCourse = async(e) => {
-    const newCourseObj ={
-      user_id: user._id,
-      course_code: courseFormData.code.trim(),
-      course_name: courseFormData.course_name,
-      instructor: courseFormData.instructor || "TBD",
-      credit: Number(courseFormData.credit) || 0,
-      description: courseFormData.description || "",
-      color: courseFormData.color
-    };
-    try{
-      const response = await axios.post("http://localhost:3000/api/course", newCourseObj);
-      const savedCourse = response.data;
-      alert("successful");
-
-      setCourses((prev) => [savedCourses, ...prev]);
-      setCurrentPage("courses");
-      resetCourseForm();
-      setTimeout(() => {
-      courseFormRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 0);
-    }catch(error){
-      console.error("Error adding course:", error.response?.data || error.message);
-      alert("Cannot add course");
-    }
-
+  const handleAddCourse = () => {
     setCurrentPage("courses");
     resetCourseForm();
     setTimeout(() => {
@@ -828,7 +778,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     const todaySchedule = classes.filter((c) => c.dayOfWeek === todayName);
 
     return (
-      <div className="max-w-7xl w-full">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back! 👋</h2>
           <p className="text-gray-600">Here's your academic overview for today</p>
@@ -1003,10 +953,8 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
       orange: "from-orange-500 to-orange-600",
     };
 
-
-
     return (
-      <div className="max-w-7xl w-full">
+      <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-1">My Courses</h2>
@@ -1040,7 +988,108 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               </button>
             )}
           </div>
-          <AddCourseForm user={user} courseColorPalette={courseColorPalette} editingCourseId={editingCourseId} setCourses={setCourses} resetCourseForm={resetCourseForm}/>
+          <form onSubmit={handleCourseSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Course Code</label>
+                <input
+                  name="code"
+                  value={courseForm.code}
+                  onChange={handleCourseInputChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  placeholder="e.g. CS101"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Course Name</label>
+                <input
+                  name="name"
+                  value={courseForm.name}
+                  onChange={handleCourseInputChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  placeholder="Introduction to CS"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Instructor</label>
+                <input
+                  name="instructor"
+                  value={courseForm.instructor}
+                  onChange={handleCourseInputChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  placeholder="Dr. Jane Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Credits</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="credits"
+                  value={courseForm.credits}
+                  onChange={handleCourseInputChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                <input
+                  name="semester"
+                  value={courseForm.semester}
+                  onChange={handleCourseInputChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  placeholder="Fall 2024"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Accent Color</label>
+                <select
+                  name="color"
+                  value={courseForm.color}
+                  onChange={handleCourseInputChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  {courseColorPalette.map((color) => (
+                    <option key={color} value={color}>
+                      {color.charAt(0).toUpperCase() + color.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                name="description"
+                value={courseForm.description}
+                onChange={handleCourseInputChange}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                rows="3"
+                placeholder="Brief summary of the course"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              {editingCourseId && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCourse(editingCourseId)}
+                  className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
+              <button
+                type="submit"
+                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
+              >
+                {editingCourseId ? "Save Changes" : "Add Course"}
+              </button>
+            </div>
+          </form>
         </div>
 
         {courses.length === 0 ? (
@@ -1050,7 +1099,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
-              <div key={course._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div key={course.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className={`bg-gradient-to-br ${colorClasses[course.color]} p-6 text-white relative`}>
                   <div className="absolute top-4 right-4 flex space-x-2">
                     <button
@@ -1060,7 +1109,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                       <Edit className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteCourse(course._id)}
+                      onClick={() => handleDeleteCourse(course.id)}
                       className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -1080,7 +1129,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                     localStorage.setItem("selectedCourse", JSON.stringify(course));
                   }} 
                     className="w-full text-left bg-gray-50 hover:bg-gray-100 text-blue-600 px-3 py-2 rounded-lg transition-colors">
-                    {course.course_name}
+                    {course.name}
                   </button>
                 </h4>
                   <div className="flex items-center text-sm text-gray-600 mb-2">
@@ -1174,7 +1223,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     );
 
     return (
-      <div className="max-w-7xl w-full">
+      <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Weekly Timetable</h2>
@@ -1387,7 +1436,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     const overdueList = filteredAssignments.filter((a) => a.status === "overdue");
 
     return (
-      <div className="max-w-7xl w-full">
+      <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Assignments & Deadlines</h2>
@@ -1468,7 +1517,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               >
                 <option value="all">All Courses</option>
                 {courses.map((c) => (
-                  <option key={c._id} value={c._id}>
+                  <option key={c.id} value={c.id}>
                     {c.code}
                   </option>
                 ))}
@@ -1769,7 +1818,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     const todayTotal = todaySessions.reduce((acc, s) => acc + s.duration, 0);
 
     return (
-      <div className="max-w-5xl w-full">
+      <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-1">Study Timer</h2>
           <p className="text-gray-600">Track your study sessions and build consistency</p>
@@ -1797,7 +1846,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               >
                 <option value="">Choose a course...</option>
                 {courses.map((c) => (
-                  <option key={c._id} value={c._id}>
+                  <option key={c.id} value={c.id}>
                     {c.code} - {c.name}
                   </option>
                 ))}
@@ -1977,7 +2026,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     };
 
     return (
-      <div className="max-w-5xl w-full">
+      <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
             <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
@@ -2067,7 +2116,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               >
                 {courses.length === 0 && <option value="">No courses</option>}
                 {courses.map((course) => (
-                  <option key={course._id} value={course._id}>
+                  <option key={course.id} value={course.id}>
                     {course.code}
                   </option>
                 ))}
@@ -2132,7 +2181,15 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
       case "assignments":
         return <AssignmentsPage />;
       case "notes":
-        return <NotesPage />;
+        return user ? (
+          <Suspense fallback={<div className="p-6 bg-white rounded-xl shadow-sm">Loading notes...</div>}>
+            <NoteCanvas />
+          </Suspense>
+        ) : (
+          <div className="p-6 bg-white rounded-xl shadow-sm text-gray-700">
+            Please sign in to access the notes workspace.
+          </div>
+        );
       case "timer":
         return <StudyTimerPage />;
       case "syllabus":
@@ -2241,8 +2298,8 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 w-full">
-          <div className="px-3 sm:px-4 pt-2 pb-6">
+        <main className="flex-1 w-full md:ml-4 lg:ml-6">
+          <div className="px-4 sm:px-6 lg:px-8 py-6">
             <div className="mb-6 space-y-3">
               {authError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">{authError}</div>
@@ -2337,7 +2394,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                       className="w-full border border-gray-300 rounded-lg px-4 py-2"
                     >
                       {courses.map((course) => (
-                        <option key={course._id} value={course._id}>
+                        <option key={course.id} value={course.id}>
                           {course.code} — {course.name}
                         </option>
                       ))}
@@ -2435,7 +2492,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
               ) : (
                 <div className="space-y-3">
                   {classes.map((session) => {
-                    const course = courses.find((course) => course._id === session.courseId);
+                    const course = courses.find((course) => course.id === session.courseId);
                     return (
                       <div
                         key={session.id}
@@ -2504,7 +2561,7 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
                       className="w-full border border-gray-300 rounded-lg px-4 py-2"
                     >
                       {courses.map((course) => (
-                        <option key={course._id} value={course._id}>
+                        <option key={course.id} value={course.id}>
                           {course.code} — {course.name}
                         </option>
                       ))}
