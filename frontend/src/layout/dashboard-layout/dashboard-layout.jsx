@@ -2,27 +2,12 @@ import React, {use, useEffect,useState} from "react";
 import {
   Calendar,
   BookOpen,
-  FileText,
   Clock,
-  Settings,
   Plus,
   CheckSquare,
   FileEdit,
   CalendarDays,
   TrendingUp,
-  Trash2,
-  Edit,
-  Download,
-  Search,
-  Filter,
-  PlayCircle,
-  PauseCircle,
-  Upload,
-  Sparkles,
-  X,
-  Menu,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 
 export default function Dashboard({courses}){
@@ -37,33 +22,40 @@ export default function Dashboard({courses}){
   const [totalStudyTime, setStudyTime] = useState(0);
   const [deadlineItem,setDeadlineItem] = useState([]);
 
+  const statsCardGradient = {
+    active: "from-blue-500 to-blue-600",
+    due: "from-purple-500 to-purple-600",
+    streak: "from-orange-500 to-orange-600",
+    time: "from-green-500 to-green-600",
+  };
+
   const stats = [
     {
+      key: "active",
       label: "Active Courses",
       value: courses.length,
       subtitle: "This semester",
-      color: "from-blue-500 to-blue-600",
       icon: BookOpen,
     },
     {
+      key: "due",
       label: "Due Soon",
       value: upcomingAssignments,
       subtitle: "Pending tasks",
-      color: "from-purple-500 to-purple-600",
       icon: CheckSquare,
     },
     {
+      key: "streak",
       label: "Study Streak",
       value: "1 days",
       subtitle: "Keep it going!",
-      color: "from-orange-500 to-orange-600",
       icon: TrendingUp,
     },
     {
+      key: "time",
       label: "Today's Study Time",
       value: `${Math.floor(totalStudyTime / 60)}h ${totalStudyTime % 60}m`,
       subtitle: "Total time studied",
-      color: "from-green-500 to-green-600",
       icon: Clock,
     },
   ];
@@ -101,7 +93,7 @@ export default function Dashboard({courses}){
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <div key={i} className={`bg-gradient-to-br ${stat.color} rounded-xl p-6 text-white shadow-lg`}>
+            <div key={i} className={`bg-gradient-to-br ${statsCardGradient[stat.key]} rounded-xl p-6 text-white shadow-lg`}>
               <div className="flex items-center mb-2">
                 <Icon className="w-5 h-5 mr-2 opacity-80" />
                 <span className="text-sm font-medium opacity-90">{stat.label}</span>
@@ -112,7 +104,8 @@ export default function Dashboard({courses}){
           );
         })}
       </div>
-
+      
+      {/*deadline card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
@@ -156,7 +149,8 @@ export default function Dashboard({courses}){
               </div>
             )}
           </div>
-
+        
+        {/*schedule card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center space-x-2 mb-6">
               <Clock className="w-5 h-5 text-blue-500" />
@@ -192,6 +186,7 @@ export default function Dashboard({courses}){
           </div>
         </div>
 
+        {/*statistic card*/}    
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center space-x-2 mb-6">

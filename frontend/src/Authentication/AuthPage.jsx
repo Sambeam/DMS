@@ -16,6 +16,7 @@ export default function AuthPage({
     const [user, setUser] = useState(null);
     const [authError, setAuthError] = useState("");
     const isGoogleConfigured = Boolean(googleClientId);
+    const [rememberMe, setRememberMe] = useState(false);
     const displayUser =
     user ??
     {
@@ -25,7 +26,6 @@ export default function AuthPage({
     const avatarInitial = (displayUser.name?.[0] ?? "S").toUpperCase();
 
     const isSignup = authScreen === "signup";  
-
 
     return (
     <div className="min-h-screen w-screen bg-slate-950 text-white flex items-center justify-center px-4">
@@ -111,10 +111,23 @@ export default function AuthPage({
                 name="password"
                 type="password"
                 value={authForm.password}
+                checked={authForm.rememberMe}
                 onChange={handleAuthInput}
                 className="w-full px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••••"
               />
+            </div>
+
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <input 
+                id="remember-me"
+                name="rememberMe"
+                type="checkbox"
+                checked={authForm.rememberMe}
+                onChange={handleAuthInput}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-2 focus:ring-blue-500"
+              />
+              <label htmlFor="remember-me">Remember Me</label>
             </div>
 
             <button

@@ -153,7 +153,7 @@ const StudyHubApp = () => {
     };
   const avatarInitial = (displayUser.name?.[0] ?? "S").toUpperCase();
   const [authScreen, setAuthScreen] = useState("landing"); // landing | login | signup
-  const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
+  const [authForm, setAuthForm] = useState({ name: "", email: "", password: "", rememberMe: false });
   const [authLoading, setAuthLoading] = useState(false);
   const [stateLoading, setStateLoading] = useState(false);
   const [stateError, setStateError] = useState("");
@@ -161,8 +161,8 @@ const StudyHubApp = () => {
   
 
   const handleAuthInput = (e) => {
-    const { name, value } = e.target;
-    setAuthForm((prev) => ({ ...prev, [name]: value }));
+    const { name, type, checked, value } = e.target;
+    setAuthForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value, }));
   };
 
   const fetchUserByEmail = useCallback(async (email) => {
@@ -193,6 +193,30 @@ const StudyHubApp = () => {
     [fetchUserByEmail]
   );
 
+  const login_cache_key = "study_key"
+    
+  const saveLoginCache = (user) => {
+    localStorage.setItem(login_cache_key, JSON.stringify({user, ts:Date.now()}));
+  };
+
+  const loadLoginCache = () => {
+    const raw = localStorage.getItem(login_cache_key);
+    if(!raw)return null;
+    try{
+      const {user, ts} = JSON.parse(raw);
+      return user;
+    }catch{
+      return null;
+    }
+  };
+  useEffect(() => {
+      const cachedUser = loadLoginCache();
+      if (cachedUser) {
+        setUser(cachedUser);
+        setAuthScreen("dashboard");
+      }
+    },[]);
+
   const handleManualAuth = async (e) => {
     e.preventDefault();
     setAuthError("");
@@ -218,7 +242,10 @@ const StudyHubApp = () => {
       }
       const savedUser = formatUserForClient(response.data);
       setUser(savedUser);
-      setAuthForm({ name: "", email: "", password: "" });
+      if(authForm.rememberMe == true){
+        saveLoginCache(savedUser)
+      }
+      setAuthForm({ name: "", email: "", password: "", rememberMe: false });
       setAuthScreen("landing");
     } catch (error) {
       console.error("Authentication error:", error);
@@ -1989,18 +2016,18 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
       return <LandingPage setAuthScreen={setAuthScreen} />;
     }
     return <AuthPage   authScreen={authScreen}
-  setAuthScreen={setAuthScreen}
-  authForm={authForm}
-  handleAuthInput={handleAuthInput}
-  authLoading={authLoading}
-  handleManualAuth={handleManualAuth}
-  googleReady={googleReady}
-  isGoogleLoading={isGoogleLoading}
-  googleButtonRef={googleButtonRef}/>;
+    setAuthScreen={setAuthScreen}
+    authForm={authForm}
+    handleAuthInput={handleAuthInput}
+    authLoading={authLoading}
+    handleManualAuth={handleManualAuth}
+    googleReady={googleReady}
+    isGoogleLoading={isGoogleLoading}
+    googleButtonRef={googleButtonRef}/>;
   }
 
   return (
-    <div className="min-h-screen w-screen overflow-x-hidden bg-gray-50">
+    <div className="min-h-screen w-screen overflow-x-hidden bg-gray-50 text-gray-900">
       {/* Top bar (mobile) */}
       <div className="md:hidden sticky top-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <button
