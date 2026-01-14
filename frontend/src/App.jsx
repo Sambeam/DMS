@@ -36,6 +36,7 @@ import CalendarPage from "./layout/calendar-layout/calendar-layout.jsx"
 import AssignmentsPage from "./layout/assignment-page-layout/assignment-page-lauout.jsx"
 import StudyTimerPage from "./layout/timer-layout/timer-layout.jsx"
 import AISyllabusParser from "./layout/ai-parser-layout/ai-parse-layout.jsx"
+import CoursesPage from "./layout/course-page-layout.jsx"
 
 import axios from "axios";
 const NoteCanvas = lazy(() => import("./layout/note-layout/NoteCanvas.jsx"));
@@ -780,121 +781,6 @@ const StudyHubApp = () => {
   };
 
   // ----- PAGES -----
-  
-
-  const CoursesPage = () => {
-    const colorClasses = {
-      purple: "from-purple-500 to-purple-600",
-      blue: "from-blue-500 to-blue-600",
-      pink: "from-pink-500 to-pink-600",
-      green: "from-green-500 to-green-600",
-      orange: "from-orange-500 to-orange-600",
-    };
-
-    return (
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-1">My Courses</h2>
-            <p className="text-gray-600">Manage your course load for the semester</p>
-          </div>
-          <button
-            onClick={handleAddCourse}
-            className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Add Course
-          </button>
-        </div>
-
-        <div
-          ref={courseFormRef}
-          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingCourseId ? "Update Course" : "Add a Course"}
-              </h3>
-              <p className="text-sm text-gray-500">
-                Enter the course details below to add it to your dashboard.
-              </p>
-            </div>
-            {editingCourseId && (
-              <button onClick={resetCourseForm} className="text-sm text-gray-500 hover:text-gray-700">
-                Cancel
-              </button>
-            )}
-          </div>
-          <AddCourseForm
-            user={user}
-            courseColorPalette={courseColorPalette}
-            editingCourseId={editingCourseId}
-            onCourseCreated={handleCourseCreatedFromForm}
-            onDeleteCourse={(courseId) => {
-              const targetCourse = courses.find((c) => c.id === courseId);
-              if (targetCourse) {
-                handleDeleteCourse(targetCourse);
-              }
-            }}
-            resetCourseForm={resetCourseForm}
-          />
-        </div>
-
-        {courses.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center text-gray-500">
-            No courses yet. Use the form above to add your first class.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
-              <div key={course.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className={`bg-gradient-to-br ${colorClasses[course.color]} p-6 text-white relative`}>
-                  <div className="absolute top-4 right-4 flex space-x-2">
-                    <button
-                      onClick={() => handleEditCourse(course)}
-                      className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                    >
-                      <Edit className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCourse(course)}
-                      className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <h3 className="text-2xl font-bold mb-2">{course.code}</h3>
-                  <div className="flex items-center text-sm opacity-90">
-                    <BookOpen className="w-4 h-4 mr-1" />
-                    <span>{course.credits} credits</span>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                  <button onClick={()=>{
-                    setSelectedCourse(course)
-                    setCurrentPage("courseLayout")
-                    localStorage.setItem("selectedCourse", JSON.stringify(course));
-                  }} 
-                    className="w-full text-left bg-gray-50 hover:bg-gray-100 text-blue-600 px-3 py-2 rounded-lg transition-colors">
-                    {course.name}
-                  </button>
-                </h4>
-                  <div className="flex items-center text-sm text-gray-600 mb-2">
-                    <span className="mr-1">👤</span>
-                    {course.instructor}
-                  </div>
-                  <div className="text-sm text-gray-600 mb-3">{course.semester}</div>
-                  <p className="text-sm text-gray-500">{course.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const NotesPage = () => {
     const [selectedNotebook, setSelectedNotebook] = useState(notebooks[0]);
@@ -1083,7 +969,19 @@ const StudyHubApp = () => {
           handleAddClass={handleAddClass} 
           handleAddCourse={handleAddCourse}/>;
       case "courses":
-        return <CoursesPage />;
+        return <CoursesPage 
+          courses={courses}
+          user={user}
+          courseColorPalette={courseColorPalette}
+          courseFormRef={courseFormRef}
+          editingCourseId={editingCourseId}
+          resetCourseForm={resetCourseForm}
+          handleCourseCreatedFromForm={handleCourseCreatedFromForm}
+          handleDeleteCourse={handleDeleteCourse}
+          handleEditCourse={handleEditCourse}
+          handleAddCourse={handleAddCourse}
+          setSelectedCourse={setSelectedCourse}
+          setCurrentPage={setCurrentPage}/>;
       case "calendar":
         return <CalendarPage 
           WEEK_DAYS={WEEK_DAYS} 
