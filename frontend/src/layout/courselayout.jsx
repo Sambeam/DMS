@@ -1,3 +1,4 @@
+/*page layout where a registered course details and related features are files are displayed*/
 import React, {useEffect,useState} from "react";
 import { useParams } from "react-router-dom";
 import Tabs from "@mui/material/Tabs";

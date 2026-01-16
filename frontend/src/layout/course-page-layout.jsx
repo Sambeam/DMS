@@ -1,3 +1,4 @@
+/*Page layout where user's registered courses are displayed*/
 import React, {useEffect,useState} from "react";
 import {
   BookOpen,

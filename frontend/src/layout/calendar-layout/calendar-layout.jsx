@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import NewClassForm from "./new-class-form";
 
 export default function CalendarPage({
   WEEK_DAYS, 
@@ -23,7 +24,10 @@ export default function CalendarPage({
   holidaysLoading, 
   holidayError, 
   classes,
-  openScheduleModal,
+  classForm,
+  setClassForm,
+  courses,
+  SESSION_TYPES,
 }){
   const timeSlots = ["8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM"];
   const MONTH_NAMES = [
@@ -56,7 +60,7 @@ export default function CalendarPage({
       };
       return map[label];
     };
-
+    
     const handlePrevMonth = () => {
       setCalendarMonth((prev) => {
         if (prev === 0) {
@@ -165,6 +169,30 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
     a.click();
     URL.revokeObjectURL(url);
   };
+
+      //new class form state//
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
+  const openScheduleModal = (resetForm = false) => {
+    if (courses.length === 0) {
+      alert("Add a course first.");
+      return;
+    }
+    if (resetForm || !classForm.courseId) {
+      setEditingClassId(null);
+      setClassForm({
+        courseId: courses[0]?.id ?? "",
+        type: "lecture",
+        dayOfWeek: "Monday",
+        startTime: "09:00",
+        endTime: "10:00",
+        location: "",
+      });
+    }
+    setIsScheduleModalOpen(true);
+  };
+
+  const [editingClassId, setEditingClassId] = useState(null);
 
     return (
       <div className="max-w-7xl mx-auto">
@@ -362,6 +390,20 @@ END:VCALENDAR`.replace(/\n/g, "\r\n");
             </table>
           </div>
         </div>
+        {isScheduleModalOpen && (
+          <NewClassForm 
+            isScheduleModalOpen={isScheduleModalOpen} 
+            setIsScheduleModalOpen={setIsScheduleModalOpen} 
+            setClassForm={setClassForm} 
+            courses={courses} 
+            editingClassId={editingClassId} 
+            setEditingClassId={setEditingClassId}
+            classForm={classForm}
+            SESSION_TYPES={SESSION_TYPES}
+            WEEK_DAYS={WEEK_DAYS}
+            classes={classes}
+          />
+        )};
       </div>
     );
   };

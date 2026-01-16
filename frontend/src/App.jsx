@@ -5,24 +5,12 @@ import {
   FileText,
   Clock,
   Settings,
-  Plus,
   CheckSquare,
-  FileEdit,
-  CalendarDays,
   TrendingUp,
   Trash2,
   Edit,
-  Download,
-  Search,
-  Filter,
-  PlayCircle,
-  PauseCircle,
-  Upload,
-  Sparkles,
   X,
   Menu,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { Routes, Route, useLocation } from "react-router-dom";
 
@@ -40,8 +28,6 @@ import CoursesPage from "./layout/course-page-layout.jsx"
 
 import axios from "axios";
 const NoteCanvas = lazy(() => import("./layout/note-layout/NoteCanvas.jsx"));
-import AddCourseForm from "./AddCourseForm.jsx";
-
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SESSION_TYPES = ["lecture", "lab", "tutorial"];
@@ -273,8 +259,6 @@ const StudyHubApp = () => {
   const [editingCourseId, setEditingCourseId] = useState(null);
   const courseFormRef = useRef(null);
 
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [editingClassId, setEditingClassId] = useState(null);
   const [classForm, setClassForm] = useState({
     courseId: courses[0]?.id ?? "",
     type: "lecture",
@@ -654,34 +638,7 @@ const StudyHubApp = () => {
     }
   };
 
-  const closeScheduleModal = () => {
-    setIsScheduleModalOpen(false);
-    setEditingClassId(null);
-  };
-
-  const openScheduleModal = (resetForm = false) => {
-    if (courses.length === 0) {
-      alert("Add a course first.");
-      return;
-    }
-    if (resetForm || !classForm.courseId) {
-      setEditingClassId(null);
-      setClassForm({
-        courseId: courses[0]?.id ?? "",
-        type: "lecture",
-        dayOfWeek: "Monday",
-        startTime: "09:00",
-        endTime: "10:00",
-        location: "",
-      });
-    }
-    setIsScheduleModalOpen(true);
-  };
-
-  const handleClassInputChange = (e) => {
-    const { name, value } = e.target;
-    setClassForm((prev) => ({ ...prev, [name]: value }));
-  };
+  
 
   const handleAssignmentInputChange = (e) => {
     const { name, value } = e.target;
@@ -689,39 +646,6 @@ const StudyHubApp = () => {
       ...prev,
       [name]: name === "weight" ? Number(value) : value,
     }));
-  };
-
-  const handleClassFormSubmit = (e) => {
-    e.preventDefault();
-    if (!classForm.courseId) return;
-    const payload = {
-      ...classForm,
-      id: editingClassId ?? Date.now().toString(),
-    };
-    setClasses((prev) =>
-      editingClassId ? prev.map((session) => (session.id === editingClassId ? payload : session)) : [payload, ...prev]
-    );
-    closeScheduleModal();
-  };
-
-  const handleDeleteClass = (id) => {
-    setClasses((prev) => prev.filter((session) => session.id !== id));
-    if (editingClassId === id) {
-      closeScheduleModal();
-    }
-  };
-
-  const startEditClass = (session) => {
-    setEditingClassId(session.id);
-    setClassForm({
-      courseId: session.courseId,
-      type: session.type,
-      dayOfWeek: session.dayOfWeek,
-      startTime: session.startTime,
-      endTime: session.endTime,
-      location: session.location,
-    });
-    setIsScheduleModalOpen(true);
   };
 
   const handleAddCourse = () => {
@@ -733,11 +657,6 @@ const StudyHubApp = () => {
 
   const handleAddAssignment = () => {
     openAssignmentModal();
-  };
-
-  const handleAddClass = () => {
-    openScheduleModal(true);
-    setCurrentPage("calendar");
   };
 
   const openAssignmentModal = () => {
@@ -780,175 +699,6 @@ const StudyHubApp = () => {
     setCurrentPage("assignments");
   };
 
-  // ----- PAGES -----
-
-  const NotesPage = () => {
-    const [selectedNotebook, setSelectedNotebook] = useState(notebooks[0]);
-    const [selectedPage, setSelectedPage] = useState(notebooks[0]?.pages[0] ?? null);
-    const [text, setText] = useState(selectedPage?.content ?? "");
-
-    useEffect(() => {
-      setText(selectedPage?.content ?? "");
-    }, [selectedPage]);
-
-    const saveNote = () => {
-      if (!selectedNotebook || !selectedPage) return;
-      setNotebooks((all) =>
-        all.map((nb) =>
-          nb.id !== selectedNotebook.id
-            ? nb
-            : {
-                ...nb,
-                pages: nb.pages.map((p) => (p.id === selectedPage.id ? { ...p, content: text } : p)),
-              }
-        )
-      );
-      alert("Saved!");
-    };
-
-    return (
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Notebooks Sidebar */}
-        <div className="w-72 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <button
-              onClick={() =>
-                setNotebooks((n) => [
-                  ...n,
-                  {
-                    id: Date.now().toString(),
-                    name: `Notebook ${n.length + 1}`,
-                    color: "blue",
-                    courseId: null,
-                    pages: [
-                      {
-                        id: Date.now().toString() + "-p",
-                        title: "Page 1",
-                        content: "",
-                        createdDate: new Date().toISOString(),
-                      },
-                    ],
-                  },
-                ])
-              }
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold flex items-center justify-center"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              New Notebook
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
-            {notebooks.map((nb) => (
-              <button
-                key={nb.id}
-                onClick={() => {
-                  setSelectedNotebook(nb);
-                  setSelectedPage(nb.pages[0]);
-                }}
-                className={`w-full flex items-center justify-between p-3 rounded-lg mb-2 transition-colors ${
-                  selectedNotebook?.id === nb.id ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <BookOpen className="w-5 h-5 text-blue-500" />
-                  <span className="font-medium text-gray-900">{nb.name}</span>
-                </div>
-                <span className="text-gray-400">→</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Pages Sidebar */}
-        <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-              <FileText className="w-5 h-5 mr-2 text-blue-500" />
-              {selectedNotebook?.name}
-            </h3>
-            <button
-              onClick={() => {
-                if (!selectedNotebook) return;
-                const newP = {
-                  id: Date.now().toString(),
-                  title: `Page ${selectedNotebook.pages.length + 1}`,
-                  content: "",
-                  createdDate: new Date().toISOString(),
-                };
-                setNotebooks((all) =>
-                  all.map((nb) => (nb.id === selectedNotebook.id ? { ...nb, pages: [newP, ...nb.pages] } : nb))
-                );
-                setSelectedPage(newP);
-              }}
-              className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Page
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="mb-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search pages..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-              </div>
-            </div>
-
-            {selectedNotebook?.pages.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedPage(p)}
-                className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
-                  selectedPage?.id === p.id ? "bg-white shadow-sm border border-gray-200" : "hover:bg-white"
-                }`}
-              >
-                <div className="flex items-center space-x-2 mb-1">
-                  <FileText className="w-4 h-4 text-gray-400" />
-                  <span className="font-medium text-gray-900 text-sm">{p.title}</span>
-                </div>
-                <p className="text-xs text-gray-500">{new Date(p.createdDate).toLocaleString()}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Editor Area */}
-        <div className="flex-1 bg-white flex flex-col">
-          <div className="border-b border-gray-200 p-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">{selectedPage?.title}</h2>
-            <div className="flex gap-3">
-              <button className="px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg font-medium">
-                + Section
-              </button>
-              <button
-                onClick={saveNote}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Save
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-8">
-            <textarea
-              className="w-full border border-gray-300 rounded-lg p-4 min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Start typing your notes..."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ----- NAV + LAYOUT -----
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: TrendingUp },
@@ -966,7 +716,7 @@ const StudyHubApp = () => {
         return <Dashboard 
           courses={courses} 
           handleAddAssignment={handleAddAssignment} 
-          handleAddClass={handleAddClass} 
+          //handleAddClass={handleAddClass} 
           handleAddCourse={handleAddCourse}/>;
       case "courses":
         return <CoursesPage 
@@ -996,7 +746,10 @@ const StudyHubApp = () => {
           holidaysLoading={holidaysLoading} 
           holidayError={holidayError} 
           classes={classes}
-          openScheduleModal={openScheduleModal}/>;
+          courses={courses}
+          classForm={classForm}
+          setClassForm={setClassForm}
+          SESSION_TYPES={SESSION_TYPES}/>;
       case "assignments":
         return <AssignmentsPage 
           assignments={assignments}
@@ -1203,172 +956,6 @@ const StudyHubApp = () => {
         </main>
       </div>
 
-      {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {editingClassId ? "Edit Class Session" : "Add Class Session"}
-                </h3>
-                <p className="text-sm text-gray-500">Customize the classes that appear on your weekly timetable.</p>
-              </div>
-              <button onClick={closeScheduleModal} className="p-2 rounded-full hover:bg-gray-100">
-                <X className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-
-            {courses.length === 0 ? (
-              <p className="text-sm text-gray-600">Add a course first to start building your timetable.</p>
-            ) : (
-              <form onSubmit={handleClassFormSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
-                    <select
-                      name="courseId"
-                      value={classForm.courseId}
-                      onChange={handleClassInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                    >
-                      {courses.map((course) => (
-                        <option key={course.id} value={course.id}>
-                          {course.code} — {course.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <select
-                      name="type"
-                      value={classForm.type}
-                      onChange={handleClassInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 capitalize"
-                    >
-                      {SESSION_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Day</label>
-                    <select
-                      name="dayOfWeek"
-                      value={classForm.dayOfWeek}
-                      onChange={handleClassInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                    >
-                      {WEEK_DAYS.map((day) => (
-                        <option key={day} value={day}>
-                          {day}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                    <input
-                      name="location"
-                      value={classForm.location}
-                      onChange={handleClassInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                      placeholder="Room 101"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                    <input
-                      type="time"
-                      name="startTime"
-                      value={classForm.startTime}
-                      onChange={handleClassInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                    <input
-                      type="time"
-                      name="endTime"
-                      value={classForm.endTime}
-                      onChange={handleClassInputChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-end gap-3">
-                  {editingClassId && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteClass(editingClassId)}
-                      className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
-                  >
-                    {editingClassId ? "Save Changes" : "Add Class"}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div className="mt-6">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Existing Sessions</h4>
-              {classes.length === 0 ? (
-                <p className="text-sm text-gray-500">No sessions yet. Use the form above to get started.</p>
-              ) : (
-                <div className="space-y-3">
-                  {classes.map((session) => {
-                    const course = courses.find((course) => course.id === session.courseId);
-                    return (
-                      <div
-                        key={session.id}
-                        className="border border-gray-200 rounded-lg p-3 flex items-center justify-between"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {course?.code} · {session.type} on {session.dayOfWeek}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {session.startTime} - {session.endTime} · {session.location}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => startEditClass(session)}
-                            className="p-2 rounded-lg hover:bg-gray-100"
-                            type="button"
-                          >
-                            <Edit className="w-4 h-4 text-blue-500" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClass(session.id)}
-                            className="p-2 rounded-lg hover:bg-gray-100"
-                            type="button"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
       {isAssignmentModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
