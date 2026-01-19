@@ -21,8 +21,13 @@ export const CourseSchema = z.object({
 export const CourseWorkSchema = z.object({
     course_id: z.string().min(1),
     cw_name: z.string().min(1),
-    cw_grade: z.number().min(0).max(100),
-    cw_weight: z.number().min(0).max(1)
+    cw_grade: z.number().nullable().optional(),
+    cw_weight: z.number().min(0).max(100),
+    duedate: z.coerce.date().nullable().optional(),
+    description: z.string().nullable().optional(),
+    type: z.string().optional(),
+    priority: z.string().optional(),
+    status: z.string().nullable()
 });
 
 export const QuizSchema = z.object({

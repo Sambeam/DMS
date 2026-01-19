@@ -23,7 +23,17 @@ const courseworkSchema = new mongoose.Schema({
     course_id: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true },
     cw_name:{type:String, required:true},
     cw_grade: {type:Number, default: null},
-    cw_weight: {type:Number, required: true}
+    cw_weight: {type:Number, required: true},
+    duedate: {type:Date, default: null},
+    description:{type:String, default: null},
+    type: {type:String, default: "other"},
+    priority:{type: String, default: "Medium"},
+    status:{
+        type:String, 
+        default: function(){
+            return this.cw_grade == null? "not graded" : "graded"
+        }
+    },
 });
 export const CourseWork = mongoose.model("CourseWork", courseworkSchema);
 

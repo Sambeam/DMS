@@ -100,6 +100,7 @@ router.post("/auth/login", controllers.loginUser);
 router.get("/course/user/:userId", validateParams(Schemas.makeIdSchema("userId")), controllers.getCoursesByUser);
 router.get("/course/:courseId", validateParams(Schemas.makeIdSchema("courseId")), controllers.getCoursesById);
 
+
 //for course work//
 router.get("/coursework/course/:courseId", validateParams(Schemas.makeIdSchema("courseId")), controllers.getCourseWorkByCourse);
 router.get("/coursework/grade", validateQuery(Schemas.HolidayQuerySchema), controllers.getCourseWorkByGrade);

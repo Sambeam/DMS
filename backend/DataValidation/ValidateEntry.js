@@ -24,6 +24,11 @@ export const validate = (schema) => (req,res,next)=>{
         req.body = schema.parse(req.body); //generate type safe obj if match schma//
         next(); //next middlerware//
     }catch(error){
-        res.status(400).json({errors: error.errors});
+        const errors =
+            error?.errors ??
+            error?.issues ??
+            [{ message: error?.message ?? "Validation failed" }];
+        console.error("Validation error:", errors);
+        return res.status(400).json({ errors });
     }
 };

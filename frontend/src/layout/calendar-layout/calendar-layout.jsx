@@ -60,6 +60,8 @@ export default function CalendarPage({
       };
       return map[label];
     };
+
+    const clampYear = (value) => Math.min(2100, Math.max(2000, value));
     
     const handlePrevMonth = () => {
       setCalendarMonth((prev) => {

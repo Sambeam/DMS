@@ -100,7 +100,7 @@ export const getCoursesByUser = async (req, res) => {
         const courses = await Models.Course.find({ user_id: req.params.userId });
         res.json(courses);
     } catch (err) {
-        err_500(res,error);
+        err_500(res,err);
     }
 };
 

@@ -102,9 +102,6 @@ const parseISODate = (iso) => {
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(year, month - 1, day);
 };
-
-const clampYear = (value) => Math.min(2100, Math.max(2000, value));
-
 /**
  * StudyHubApp (responsive + functional)
  * - No horizontal overflow (w-screen + overflow-x-hidden)
@@ -674,7 +671,7 @@ const StudyHubApp = () => {
     setEditingAssignmentId(null);
   };
 
-  const handleAssignmentSubmit = (e) => {
+  const handleAssignmentSubmit = async(e) => {
     e.preventDefault();
     if (!assignmentForm.title.trim()) {
       alert("Assignment title is required.");
@@ -684,11 +681,28 @@ const StudyHubApp = () => {
       alert("Select a course for the assignment.");
       return;
     }
+
     const base = {
       ...assignmentForm,
       title: assignmentForm.title.trim(),
       description: assignmentForm.description.trim(),
     };
+
+    //retrieve course ID from database//
+
+    //assignment obj to be fetch to database courseworks table//
+    const assignment_obj={
+      course_id: assignmentForm.courseId,
+      cw_name: assignmentForm.title.trim(),
+      cw_grade: null,
+      cw_weight: assignmentForm.weight,
+      duedate: assignmentForm.dueDate ? new Date(assignmentForm.dueDate) : null,
+      description: assignmentForm.description.trim(),
+      type: assignmentForm.type.trim(),
+      priority: assignmentForm.priority,
+      status:"not graded"
+    };
+
     if (editingAssignmentId) {
       setAssignments((prev) => prev.map((a) => (a.id === editingAssignmentId ? { ...base, id: editingAssignmentId } : a)));
     } else {
@@ -696,6 +710,19 @@ const StudyHubApp = () => {
     }
     setIsAssignmentModalOpen(false);
     setEditingAssignmentId(null);
+
+    try{
+      const response = await axios.post("http://localhost:3000/api/coursework",assignment_obj);
+      alert("created the obj");
+      const storedCW = response.data;
+      alert("successful");
+    }catch(error){
+      console.log("status", error.response?.status);
+      console.log("data", error.response?.data);
+      console.log("headers", error.response?.headers);
+    }
+    //setCW((prev) => [...res.data, ...prev]);
+
     setCurrentPage("assignments");
   };
 
@@ -986,7 +1013,7 @@ const StudyHubApp = () => {
                       className="w-full border border-gray-300 rounded-lg px-4 py-2"
                     >
                       {courses.map((course) => (
-                        <option key={course.id} value={course.id}>
+                        <option key={course.id} value={course._id}>
                           {course.code} — {course.name}
                         </option>
                       ))}
