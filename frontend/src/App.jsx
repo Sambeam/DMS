@@ -700,7 +700,7 @@ const StudyHubApp = () => {
       description: assignmentForm.description.trim(),
       type: assignmentForm.type.trim(),
       priority: assignmentForm.priority,
-      status:"not graded"
+      status: assignmentForm.status,
     };
 
     if (editingAssignmentId) {
@@ -1090,6 +1090,20 @@ const StudyHubApp = () => {
                       onChange={handleAssignmentInputChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      name="status"
+                      value={assignmentForm.status}
+                      onChange={handleAssignmentInputChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    >
+                      <option value="not_started">Not_Started</option>
+                      <option value="in_progress">In_Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="overdue">Overdue</option>"
+                    </select>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-3">

@@ -1,8 +1,36 @@
-import React, {use, useEffect,useState} from "react";
+/*This page display all ungrade coursework of a user(of all registered course), and allow user to add new ungraded
+coursework to their account.
+
+features:
+Display # of upcoming assignment (ungraded, with date before the current date)
+Display # of overdue assignment (ungraded, with date after the current date)
+Display # of completed assignment (graded)
+Display assignmnet completion rate (# graded assignment / # all assignments)
+List of all registered assignment (with their title, due date,status, tag)
+- filter:(done)
+  - by status (Not Started, In Progress, Overdue, Completed)
+  - by priority (low, medium, high)
+  - by course (all registered courses)
+- remove assignment
+- add assignment(done)
+  -set title
+  -set due date
+  -set course (registered courses)
+  -set description
+  -set priority (low, medium, high)
+  -set type (assignment, project, exam, lab)
+  -set weight
+- update assignment information
+
+known issue:
+- page does not reload after new assignment being added to the account, only older assignment are displayed
+*/
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import { Plus, Clock, CheckSquare, TrendingUp, Filter, BookOpen, Edit, Trash2 } from "lucide-react";
 
 export default function AssignmentsPage({
-    assignments,
+    //assignments,
     courses,
     upcomingAssignments,
     overdueAssignments,
@@ -12,20 +40,39 @@ export default function AssignmentsPage({
     setAssignmentForm,
     setEditingAssignmentId,
     setIsAssignmentModalOpen,
-    setAssignments,
+    //setAssignments,
 }){
     const [statusFilter, setStatusFilter] = useState("all");
     const [priorityFilter, setPriorityFilter] = useState("all");
     const [courseFilter, setCourseFilter] = useState("all");
+    const [assignments, setAssignments] = useState([]);
 
+    //update the display of the list of courseworks//
     const filteredAssignments = assignments.filter((a) => {
       if (statusFilter !== "all" && a.status !== statusFilter) return false;
       if (priorityFilter !== "all" && a.priority !== priorityFilter) return false;
-      if (courseFilter !== "all" && a.courseId !== courseFilter) return false;
+      if (courseFilter !== "all" && a.course_id !== courseFilter) return false;
       return true;
     });
 
     const overdueList = filteredAssignments.filter((a) => a.status === "overdue");
+
+    //update coursework list//
+    useEffect(() => {
+      const load = async () => {
+        if (!Array.isArray(courses) || courses.length === 0) {
+          setAssignments([]);
+          return;
+        }
+        try{
+          const data = await fetchCourseWork(courses);
+          setAssignments(Array.isArray(data) ? data : []);
+        } catch (err) {
+          console.error("Failed to load courseworks", err);
+        }
+      };
+      load();
+    }, [courses]);
 
     return (
       <div className="max-w-7xl mx-auto">
@@ -109,7 +156,7 @@ export default function AssignmentsPage({
               >
                 <option value="all">All Courses</option>
                 {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c._id}>
                     {c.code}
                   </option>
                 ))}
@@ -205,3 +252,18 @@ export default function AssignmentsPage({
       </div>
     );
   };
+
+  //function for all layout to fetch all coursework//
+export async function fetchCourseWork(courses){
+  const cws = [];
+  for(const course of courses){
+    try {
+      const cw = await axios.get(`http://localhost:3000/api/coursework/course/${course._id}`);
+      cws.push(...cw.data);
+    } catch (err) {
+      console.error("Failed to load courseworks", err);
+      return [];
+    }
+  }
+  return cws;
+};
