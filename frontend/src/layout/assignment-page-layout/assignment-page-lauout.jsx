@@ -28,24 +28,23 @@ known issue:
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Plus, Clock, CheckSquare, TrendingUp, Filter, BookOpen, Edit, Trash2 } from "lucide-react";
+import NewCWForm from "./new-coursework-form";
 
 export default function AssignmentsPage({
-    //assignments,
     courses,
     upcomingAssignments,
     overdueAssignments,
     completedAssignments,
     completionRate,
-    handleAddAssignment,
-    setAssignmentForm,
-    setEditingAssignmentId,
-    setIsAssignmentModalOpen,
-    //setAssignments,
 }){
     const [statusFilter, setStatusFilter] = useState("all");
     const [priorityFilter, setPriorityFilter] = useState("all");
     const [courseFilter, setCourseFilter] = useState("all");
     const [assignments, setAssignments] = useState([]);
+
+    //new assignment form state//
+    const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+    const [editingAssignmentId, setEditingAssignmentId] = useState(null);
 
     //update the display of the list of courseworks//
     const filteredAssignments = assignments.filter((a) => {
@@ -56,6 +55,38 @@ export default function AssignmentsPage({
     });
 
     const overdueList = filteredAssignments.filter((a) => a.status === "overdue");
+
+    //new assignment form functions//
+    const openAssignmentModal = () => {
+      if (courses.length === 0) {
+        alert("Add a course first.");
+        return;
+      }
+      setEditingAssignmentId(null);
+      setAssignmentForm(buildAssignmentForm());
+      setIsAssignmentModalOpen(true);
+    };
+
+    const closeAssignmentModal = () => {
+      setIsAssignmentModalOpen(false);
+      setEditingAssignmentId(null);
+    };
+
+    const handleAddAssignment = () => {
+      openAssignmentModal();
+    };
+
+    const buildAssignmentForm = () => ({
+        courseId: courses[0]?.id ?? "",
+        title: "",
+        description: "",
+        dueDate: new Date().toISOString().split("T")[0],
+        priority: "medium",
+        status: "not_started",
+        type: "assignment",
+        weight: 5,
+      });
+      const [assignmentForm, setAssignmentForm] = useState(buildAssignmentForm);
 
     //update coursework list//
     useEffect(() => {
@@ -249,6 +280,20 @@ export default function AssignmentsPage({
             </div>
           )}
         </div>
+        {isAssignmentModalOpen && (
+          <NewCWForm
+            openAssignmentModal={openAssignmentModal}
+            closeAssignmentModal={closeAssignmentModal}
+            editingAssignmentId={editingAssignmentId}
+            setEditingAssignmentId={setEditingAssignmentId}
+            courses={courses}
+            assignmentForm={assignmentForm}
+            setAssignmentForm={setAssignmentForm}
+            setAssignments={setAssignments}
+            isAssignmentModalOpen={isAssignmentModalOpen}
+            setIsAssignmentModalOpen={setIsAssignmentModalOpen}
+          />
+        )};
       </div>
     );
   };
